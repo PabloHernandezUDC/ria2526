@@ -5,7 +5,7 @@ from robobopy.Robobo import Robobo
 from robobopy.utils.IR import IR
 from robobosim.RoboboSim import RoboboSim
 from robobopy.utils.BlobColor import BlobColor
-from math import dist, log
+from math import dist
 
 class RoboboEnv(gym.Env):
 
@@ -17,38 +17,40 @@ class RoboboEnv(gym.Env):
 
         # Define what the agent can observe
         # Dict space gives us structured, human-readable observations
-        # self.observation_space = gym.spaces.Dict(
-        #     {
-        #         "agent": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),   # [x, y] coordinates
-        #         "target": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),  # [x, y] coordinates
-        #     }
-        # )
+        self.observation_space = gym.spaces.Dict(
+            {
+                "agent": gym.spaces.Box(-1000, 1000, shape=(3,), dtype=int),   # [x, z] coordinates and [y] rotation
+                "target": gym.spaces.Box(-1000, 1000, shape=(2,), dtype=int),  # [x, z] coordinates
+            }
+        )
 
         # Define what actions are available (4 directions)
         self.action_space = gym.spaces.Discrete(4)
 
-        # Map action numbers to actual movements on the grid
-        # This makes the code more readable than using raw numbers
+        # Map action numbers to actual movements
+        speed = 20
         self._action_to_direction = {
-            0: np.array([1, 0]),   # Move right (positive x)
-            1: np.array([0, 1]),   # Move up (positive y)
-            2: np.array([-1, 0]),  # Move left (negative x)
-            3: np.array([0, -1]),  # Move down (negative y)
+            0: np.array([speed, speed]),    # Forward
+            1: np.array([0, speed]),        # Turn Left
+            2: np.array([speed, 0]),        # Turn Right
+            3: np.array([-speed, speed]),   # Go Backwards
         }
+    
+    def step(self, action):
+        ...
+        return observation, reward, terminated, truncated, info
+    
+    def reset(self, seed=None, options=None):
+        ...
+        return observation, info
+    
+    def render(self):
+        ...
+    
+    def close(self):
+        ...
+        
 
-'''
-def discretize_state(state, bins, bounds):
-    discrete = []
-    for _, (val, (low, high), n_bins) in enumerate(zip(state, bounds, bins)):
-        # Crear bins equiespaciados
-        bin_width = (high - low) / n_bins
-        bin_idx = int((val - low) / bin_width)
-        # Mantener índices dentro del rango válido
-        bin_idx = max(0, min(n_bins - 1, bin_idx))
-        discrete.append(bin_idx)
-    return tuple(discrete)
-
-'''
 
 def get_robot_pos(sim: RoboboSim):
     data = sim.getRobotLocation(0)
@@ -82,9 +84,7 @@ def get_reward(robot_pos: dict, target_pos: dict):
 
 
 def get_robot_observation(rob: Robobo, target_color: BlobColor = BlobColor.RED):
-    x = rob.readColorBlob(target_color).posx
-    
-    return x
+    return rob.readColorBlob(target_color).posx
 
 
 
@@ -103,18 +103,25 @@ def main():
 
 
 
+    # DEBUG: intentando mover el cilindro
+    p = sim.getObjectLocation("CYLINDERMIDBALL")
+    p["position"]["x"] += 250
+    sim.setObjectLocation("CYLINDERMIDBALL", p)
+    # DEBUG
 
-
-
-    # robobo.moveWheels(15, 15)
-    # for i in range(1000):
-        # robot_pos = get_robot_pos(sim)
-        # target_pos = get_cylinder_pos(sim)
+    
+    robobo.moveWheels(15, 15)
+    for i in range(1000):
+        robot_pos = get_robot_pos(sim)
+        target_pos = get_cylinder_pos(sim)
         # print("robot is at", robot_pos)
         # print(f"distance to cylinder: {get_distance_to_target(robot_pos, target_pos)}")
         # print(f"reward: {get_reward(robot_pos, target_pos)}")
 
-        # time.sleep(.1)
+
+        print(target_pos)
+
+        time.sleep(.1)
 
 
 
@@ -127,13 +134,18 @@ def main():
 if __name__ == "__main__":
     main()
 
+
+
+
+
+
 '''
 TODO:
 
-hacer el espacio de estados a partir de lo que observa el robot (por ejemplo, la posicion del blob rojo) (ya está medio empezado)
-hacer el espacio de acciones (probablemente solo alante, atrás, girar izquierda, girar derecha)
+¿hecho? hacer el espacio de estados a partir de lo que observa el robot (por ejemplo, la posicion del blob rojo) (ya está medio empezado)
+¿hecho? hacer el espacio de acciones (probablemente solo alante, atrás, girar izquierda, girar derecha)
 
-añadir pa escoger acción aleatoria
+¿hecho? añadir pa escoger acción aleatoria
 añadir función step
 
 añadir todo lo relevante al env de gymnasium en la clase RoboboEnv (probablemente lo que hay puesto ahí no sirva para nada)
