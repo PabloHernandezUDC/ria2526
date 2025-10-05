@@ -4,7 +4,8 @@ import gymnasium as gym
 from robobopy.Robobo import Robobo
 from robobopy.utils.IR import IR
 from robobosim.RoboboSim import RoboboSim
-
+from robobopy.utils.BlobColor import BlobColor
+from math import dist, log
 
 class RoboboEnv(gym.Env):
 
@@ -49,22 +50,42 @@ def discretize_state(state, bins, bounds):
 
 '''
 
-def observe_robot(sim: RoboboSim):
+def get_robot_pos(sim: RoboboSim):
     data = sim.getRobotLocation(0)
     
-    # DEBUG
-    print(data)
-    # DEBUG
-    
     pos_x = data["position"]["x"]
-    # pos_y = data["position"]["y"]
+    pos_z = data["position"]["z"]    
+    rot_y = data["rotation"]["y"]
+    
+    return {"x": pos_x, "z": pos_z, "y": rot_y}
+
+def get_cylinder_pos(sim: RoboboSim):
+    
+    # IMPORTANTE: la posición del cilindro no se actualiza en tiempo real,
+    # solo podemos saber la inicial
+    
+    data = sim.getObjectLocation("CYLINDERMIDBALL")
+
+    pos_x = data["position"]["x"]
     pos_z = data["position"]["z"]
     
-    # rot_x = data["rotation"]["x"]
-    rot_y = data["rotation"]["y"]
-    # rot_z = data["rotation"]["z"]
+    return {"x": pos_x, "z": pos_z}
+
+def get_distance_to_target(robot_pos: dict, target_pos: dict):
+    rx, rz = robot_pos["x"], robot_pos["z"]
+    tx, tz = target_pos["x"], target_pos["z"]
+    return dist((rx, rz), (tx, tz))
+
+def get_reward(robot_pos: dict, target_pos: dict):
+    r = 1000 / get_distance_to_target(robot_pos, target_pos)
+    return r
+
+
+def get_robot_observation(rob: Robobo, target_color: BlobColor = BlobColor.RED):
+    x = rob.readColorBlob(target_color).posx
     
-    return ((pos_x, pos_z, rot_y))
+    return x
+
 
 
 
@@ -80,11 +101,20 @@ def main():
     robobo.connect()
     sim.connect()
 
-    robobo.moveWheels(0, 15)
 
-    for _ in range(1000):
-        observe_robot(sim)
-        time.sleep(.1)
+
+
+
+
+    # robobo.moveWheels(15, 15)
+    # for i in range(1000):
+        # robot_pos = get_robot_pos(sim)
+        # target_pos = get_cylinder_pos(sim)
+        # print("robot is at", robot_pos)
+        # print(f"distance to cylinder: {get_distance_to_target(robot_pos, target_pos)}")
+        # print(f"reward: {get_reward(robot_pos, target_pos)}")
+
+        # time.sleep(.1)
 
 
 
@@ -96,3 +126,19 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+'''
+TODO:
+
+hacer el espacio de estados a partir de lo que observa el robot (por ejemplo, la posicion del blob rojo) (ya está medio empezado)
+hacer el espacio de acciones (probablemente solo alante, atrás, girar izquierda, girar derecha)
+
+añadir pa escoger acción aleatoria
+añadir función step
+
+añadir todo lo relevante al env de gymnasium en la clase RoboboEnv (probablemente lo que hay puesto ahí no sirva para nada)
+
+... y hacer el resto de la práctica
+
+
+'''
