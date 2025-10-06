@@ -6,28 +6,21 @@ from robobopy.utils.IR import IR
 from robobosim.RoboboSim import RoboboSim
 from robobopy.utils.BlobColor import BlobColor
 from math import dist
+from stable_baselines3 import A2C
 
 class RoboboEnv(gym.Env):
 
     def __init__(self):
-        # Initialize positions - will be set randomly in reset()
-        # Using -1,-1 as "uninitialized" state
-        # self._agent_location = np.array([-1, -1], dtype=np.int32)
-        # self._target_location = np.array([-1, -1], dtype=np.int32)
-
-        # Define what the agent can observe
-        # Dict space gives us structured, human-readable observations
         self.observation_space = gym.spaces.Dict(
             {
-                "agent": gym.spaces.Box(-1000, 1000, shape=(3,), dtype=int),   # [x, z] coordinates and [y] rotation
-                "target": gym.spaces.Box(-1000, 1000, shape=(2,), dtype=int),  # [x, z] coordinates
+                # "agent": gym.spaces.Box(-1000, 1000, shape=(3,), dtype=int),   # [x, z] coordinates and [y] rotation
+                # "target": gym.spaces.Box(-1000, 1000, shape=(2,), dtype=int),  # [x, z] coordinates
+                "red_x": gym.spaces.Box(0, 100, shape=(1,), dtype=int)
             }
         )
 
-        # Define what actions are available (4 directions)
         self.action_space = gym.spaces.Discrete(4)
 
-        # Map action numbers to actual movements
         speed = 20
         self._action_to_direction = {
             0: np.array([speed, speed]),    # Forward
@@ -35,21 +28,82 @@ class RoboboEnv(gym.Env):
             2: np.array([speed, 0]),        # Turn Right
             3: np.array([-speed, speed]),   # Go Backwards
         }
-    
+        
+        ip = "localhost"
+        self.robobo = Robobo(ip)
+        self.sim = RoboboSim(ip)
+        self.robobo.connect()
+        self.sim.connect()
+                
+        self.target_pos = get_cylinder_pos(self.sim)
+        self.target_color = BlobColor.RED
+            
     def step(self, action):
-        ...
+        l_speed, r_speed = self._action_to_direction[action]
+        
+        duration = 0.5 # habría que adaptarlo si se acelera el simulador
+        self.robobo.moveWheelsByTime(r_speed, l_speed, duration=duration, wait=False)
+        time.sleep(duration)
+
+        observation = self._get_obs()
+
+        distance = get_distance_to_target(
+            get_robot_pos(self.sim),
+            self.target_pos
+        )
+        
+        reward = get_reward(distance)
+
+        terminated = distance <= 50
+        
+        # TODO
+        truncated = False   
+        
+        info = self._get_info()
+        
+        print(f"Action: {parse_action(action)} | Reward: {(reward):.3f} | Distance: {(distance):.3f} | Obs: {observation}")
+        
         return observation, reward, terminated, truncated, info
     
     def reset(self, seed=None, options=None):
-        ...
+        print("Resetting env...")
+        
+        self.sim.resetSimulation()
+        self.robobo.stopMotors()
+        time.sleep(2) # sin esto no funciona (???????????)
+        self.robobo.moveTiltTo(105, speed=20, wait=False)
+        
+        observation = self._get_obs()
+        info = self._get_info()
+        
         return observation, info
     
     def render(self):
+        # TODO
         ...
     
     def close(self):
-        ...
+        self.robobo.disconnect()
+        self.sim.disconnect()
+    
+    def _get_obs(self):
+        return {"red_x": self.robobo.readColorBlob(self.target_color).posx}
+    
+    def _get_info(self):
+        return {}
         
+
+def parse_action(action: int):
+    if action == 0:
+        return "↑"
+    if action == 1:
+        return "←"
+    if action == 2:
+        return "→"
+    if action == 3:
+        return "↓"
+    else:
+        return "unknown"
 
 
 def get_robot_pos(sim: RoboboSim):
@@ -62,10 +116,8 @@ def get_robot_pos(sim: RoboboSim):
     return {"x": pos_x, "z": pos_z, "y": rot_y}
 
 def get_cylinder_pos(sim: RoboboSim):
-    
     # IMPORTANTE: la posición del cilindro no se actualiza en tiempo real,
     # solo podemos saber la inicial
-    
     data = sim.getObjectLocation("CYLINDERMIDBALL")
 
     pos_x = data["position"]["x"]
@@ -78,57 +130,28 @@ def get_distance_to_target(robot_pos: dict, target_pos: dict):
     tx, tz = target_pos["x"], target_pos["z"]
     return dist((rx, rz), (tx, tz))
 
-def get_reward(robot_pos: dict, target_pos: dict):
-    r = 1000 / get_distance_to_target(robot_pos, target_pos)
-    return r
-
-
-def get_robot_observation(rob: Robobo, target_color: BlobColor = BlobColor.RED):
-    return rob.readColorBlob(target_color).posx
-
-
-
+def get_reward(distance: float):
+    return 1000 / distance
 
 def main():
-    env = RoboboEnv()
+    gym.register(
+        id="RoboboEnv",
+        entry_point=RoboboEnv,
+    )
 
-    # Dirección IP del simulador
-    ip = "localhost"
-
-    # Inicializamos el robot y el simulador
-    robobo = Robobo(ip)
-    sim = RoboboSim(ip)
-    robobo.connect()
-    sim.connect()
-
-
-
-    # DEBUG: intentando mover el cilindro
-    p = sim.getObjectLocation("CYLINDERMIDBALL")
-    p["position"]["x"] += 250
-    sim.setObjectLocation("CYLINDERMIDBALL", p)
-    # DEBUG
-
+    env = gym.make("RoboboEnv")
     
-    robobo.moveWheels(15, 15)
+    model = A2C("MultiInputPolicy", env, verbose=1) # en el enunciado usa MlpPolicy
+    model.learn(total_timesteps=10000)
+
+    vec_env = model.get_env()
+    obs = vec_env.reset()
     for i in range(1000):
-        robot_pos = get_robot_pos(sim)
-        target_pos = get_cylinder_pos(sim)
-        # print("robot is at", robot_pos)
-        # print(f"distance to cylinder: {get_distance_to_target(robot_pos, target_pos)}")
-        # print(f"reward: {get_reward(robot_pos, target_pos)}")
+        action, _state = model.predict(obs, deterministic=True)
+        obs, reward, done, info = vec_env.step(action)
+        # vec_env.render("human")
 
 
-        print(target_pos)
-
-        time.sleep(.1)
-
-
-
-
-    time.sleep(1000)
-
-    # env.close()
 
 
 if __name__ == "__main__":
