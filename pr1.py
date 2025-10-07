@@ -41,7 +41,6 @@ class RoboboEnv(gym.Env):
         self.steps_without_target = 0
             
     def step(self, action):
-        truncated = False
         l_speed, r_speed = self._action_to_direction[action]
         
         duration = 0.5 # habría que adaptarlo si se acelera el simulador
@@ -55,23 +54,33 @@ class RoboboEnv(gym.Env):
         else:
             self.steps_without_target = 0
         
-        if self.steps_without_target >= 15:
-            print(f"Too many steps without seeing target!")
-            truncated = True
-        
 
         distance = get_distance_to_target(
             get_robot_pos(self.sim),
             self.target_pos
         )
+        
+        angle = get_angle_to_target(
+            get_robot_pos(self.sim),
+            self.target_pos            
+        )
 
-        reward = get_reward(distance)
+        reward = get_reward(distance, angle, alpha=0.5)
 
-        terminated = distance <= 50
+        terminated = False
+        if distance <= 50:
+            terminated = True
+            reward += 200
                 
         info = self._get_info()
         
         print(f"Action: {parse_action(action)} | Reward: {(reward):.3f} | Distance: {(distance):.3f} | Obs: {observation}")
+
+        truncated = False
+        if self.steps_without_target >= 15:
+            print(f"Too many steps without seeing target!")
+            truncated = True
+            self.steps_without_target = 0
         
         return observation, reward, terminated, truncated, info
     
@@ -81,8 +90,8 @@ class RoboboEnv(gym.Env):
         self.sim.resetSimulation()
         self.robobo.stopMotors()
         time.sleep(.1) # sin esto no funciona (???????????)
-        self.robobo.moveTiltTo(115, speed=20, wait=False)
-        time.sleep(2)
+        self.robobo.moveTiltTo(115, speed=20, wait=True)
+        # time.sleep(2)
         
         observation = self._get_obs()
         info = self._get_info()
@@ -143,7 +152,7 @@ def get_distance_to_target(robot_pos: dict, target_pos: dict):
     tx, tz = target_pos["x"], target_pos["z"]
     return dist((rx, rz), (tx, tz))
 
-'''
+
 def get_angle_to_target(robot_pos: dict, target_pos: dict):
     rx, rz = robot_pos["x"], robot_pos["z"]
     tx, tz = target_pos["x"], target_pos["z"]
@@ -151,37 +160,26 @@ def get_angle_to_target(robot_pos: dict, target_pos: dict):
     dx = tx - rx
     dz = tz - rz
     
-    # Angle of vector to target (in degrees)
-    target_angle = math.degrees(math.atan2(dz, dx))
+    target_angle = math.degrees(math.atan2(dx, dz))
     
-    # Robot's current orientation
     robot_angle = robot_pos["y"]
     
-    # Calculate angle difference
     angle_diff = target_angle - robot_angle
-    
-    # DEBUG
-    # print(f"robot pos: {rx, rz}")
-    # print(f"target pos: {tx, tz}")
-    # print(f"robot angle: {robot_angle}")
-    # print(f"target angle: {target_angle}")
-    # print(f"diff: {angle_diff}")
-    # print()
-    # DEBUG
     
     # Normalize to [-180, 180]
     while angle_diff > 180:
         angle_diff -= 360
     while angle_diff < -180:
         angle_diff += 360
-    
+        
     return angle_diff
-'''
 
-def get_reward(distance: float):
+
+def get_reward(distance: float, angle: float, alpha: float = 0.5):
     r1 = 1000 / distance
+    r2 = -(abs(angle) / 90)
 
-    return r1
+    return (alpha)*r1 + (1-alpha)*r2
 
 def main():
     gym.register(
@@ -195,7 +193,7 @@ def main():
     
     
     start = time.time()
-    model.learn(total_timesteps=10000)
+    model.learn(total_timesteps=4096)
     learning_time = time.time() - start
     
     print(f"Training took {(learning_time):.2f} seconds.")
