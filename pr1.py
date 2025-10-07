@@ -1,4 +1,4 @@
-import random, time
+import random, time, math
 import numpy as np
 import gymnasium as gym
 from robobopy.Robobo import Robobo
@@ -6,7 +6,7 @@ from robobopy.utils.IR import IR
 from robobosim.RoboboSim import RoboboSim
 from robobopy.utils.BlobColor import BlobColor
 from math import dist
-from stable_baselines3 import A2C
+from stable_baselines3 import PPO
 
 class RoboboEnv(gym.Env):
 
@@ -37,8 +37,11 @@ class RoboboEnv(gym.Env):
                 
         self.target_pos = get_cylinder_pos(self.sim)
         self.target_color = BlobColor.RED
+        
+        self.steps_without_target = 0
             
     def step(self, action):
+        truncated = False
         l_speed, r_speed = self._action_to_direction[action]
         
         duration = 0.5 # habría que adaptarlo si se acelera el simulador
@@ -46,19 +49,26 @@ class RoboboEnv(gym.Env):
         time.sleep(duration)
 
         observation = self._get_obs()
+        
+        if observation["red_x"] == 0:
+            self.steps_without_target += 1
+        else:
+            self.steps_without_target = 0
+        
+        if self.steps_without_target >= 15:
+            print(f"Too many steps without seeing target!")
+            truncated = True
+        
 
         distance = get_distance_to_target(
             get_robot_pos(self.sim),
             self.target_pos
         )
-        
+
         reward = get_reward(distance)
 
         terminated = distance <= 50
-        
-        # TODO
-        truncated = False   
-        
+                
         info = self._get_info()
         
         print(f"Action: {parse_action(action)} | Reward: {(reward):.3f} | Distance: {(distance):.3f} | Obs: {observation}")
@@ -70,8 +80,9 @@ class RoboboEnv(gym.Env):
         
         self.sim.resetSimulation()
         self.robobo.stopMotors()
-        time.sleep(2) # sin esto no funciona (???????????)
-        self.robobo.moveTiltTo(105, speed=20, wait=False)
+        time.sleep(.1) # sin esto no funciona (???????????)
+        self.robobo.moveTiltTo(115, speed=20, wait=False)
+        time.sleep(2)
         
         observation = self._get_obs()
         info = self._get_info()
@@ -87,7 +98,9 @@ class RoboboEnv(gym.Env):
         self.sim.disconnect()
     
     def _get_obs(self):
-        return {"red_x": self.robobo.readColorBlob(self.target_color).posx}
+        return {
+            "red_x": np.array([self.robobo.readColorBlob(self.target_color).posx])
+            }
     
     def _get_info(self):
         return {}
@@ -130,8 +143,45 @@ def get_distance_to_target(robot_pos: dict, target_pos: dict):
     tx, tz = target_pos["x"], target_pos["z"]
     return dist((rx, rz), (tx, tz))
 
+'''
+def get_angle_to_target(robot_pos: dict, target_pos: dict):
+    rx, rz = robot_pos["x"], robot_pos["z"]
+    tx, tz = target_pos["x"], target_pos["z"]
+
+    dx = tx - rx
+    dz = tz - rz
+    
+    # Angle of vector to target (in degrees)
+    target_angle = math.degrees(math.atan2(dz, dx))
+    
+    # Robot's current orientation
+    robot_angle = robot_pos["y"]
+    
+    # Calculate angle difference
+    angle_diff = target_angle - robot_angle
+    
+    # DEBUG
+    # print(f"robot pos: {rx, rz}")
+    # print(f"target pos: {tx, tz}")
+    # print(f"robot angle: {robot_angle}")
+    # print(f"target angle: {target_angle}")
+    # print(f"diff: {angle_diff}")
+    # print()
+    # DEBUG
+    
+    # Normalize to [-180, 180]
+    while angle_diff > 180:
+        angle_diff -= 360
+    while angle_diff < -180:
+        angle_diff += 360
+    
+    return angle_diff
+'''
+
 def get_reward(distance: float):
-    return 1000 / distance
+    r1 = 1000 / distance
+
+    return r1
 
 def main():
     gym.register(
@@ -141,8 +191,16 @@ def main():
 
     env = gym.make("RoboboEnv")
     
-    model = A2C("MultiInputPolicy", env, verbose=1) # en el enunciado usa MlpPolicy
+    model = PPO("MultiInputPolicy", env, verbose=1) # en el enunciado usa MlpPolicy
+    
+    
+    start = time.time()
     model.learn(total_timesteps=10000)
+    learning_time = time.time() - start
+    
+    print(f"Training took {(learning_time):.2f} seconds.")
+    
+    model.save("checkpoint.zip")
 
     vec_env = model.get_env()
     obs = vec_env.reset()
@@ -157,23 +215,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-
-
-
-
-
-'''
-TODO:
-
-¿hecho? hacer el espacio de estados a partir de lo que observa el robot (por ejemplo, la posicion del blob rojo) (ya está medio empezado)
-¿hecho? hacer el espacio de acciones (probablemente solo alante, atrás, girar izquierda, girar derecha)
-
-¿hecho? añadir pa escoger acción aleatoria
-añadir función step
-
-añadir todo lo relevante al env de gymnasium en la clase RoboboEnv (probablemente lo que hay puesto ahí no sirva para nada)
-
-... y hacer el resto de la práctica
-
-
-'''
