@@ -99,6 +99,8 @@ class RoboboEnv(gym.Env):
         observation = self._get_obs()
         info = self._get_info()
         
+        self.target_pos = get_cylinder_pos(self.sim)
+        
         return observation, info
     
     def render(self):
@@ -210,7 +212,7 @@ def main():
     
     
     start = time.time()
-    model.learn(total_timesteps=4096)
+    model.learn(total_timesteps=8192)
     learning_time = time.time() - start
     
     print(f"Training took {(learning_time):.2f} seconds.")
