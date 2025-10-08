@@ -15,18 +15,19 @@ class RoboboEnv(gym.Env):
             {
                 # "agent": gym.spaces.Box(-1000, 1000, shape=(3,), dtype=int),   # [x, z] coordinates and [y] rotation
                 # "target": gym.spaces.Box(-1000, 1000, shape=(2,), dtype=int),  # [x, z] coordinates
-                "red_x": gym.spaces.Box(0, 100, shape=(1,), dtype=int)
+                "x_offset": gym.spaces.Box(-1, 100, shape=(1,), dtype=int),
+                "sector": gym.spaces.Discrete(3)
             }
         )
 
         self.action_space = gym.spaces.Discrete(4)
 
-        speed = 20
+        speed = 10
         self._action_to_direction = {
-            0: np.array([speed, speed]),    # Forward
-            1: np.array([0, speed]),        # Turn Left
-            2: np.array([speed, 0]),        # Turn Right
-            3: np.array([-speed, speed]),   # Go Backwards
+            0: np.array([speed*3, speed*3]), # Forward
+            1: np.array([0, speed]),         # Turn Left
+            2: np.array([speed, 0]),         # Turn Right
+            3: np.array([-speed, -speed]),   # Go Backwards
         }
         
         ip = "localhost"
@@ -44,12 +45,12 @@ class RoboboEnv(gym.Env):
         l_speed, r_speed = self._action_to_direction[action]
         
         duration = 0.5 # habría que adaptarlo si se acelera el simulador
-        self.robobo.moveWheelsByTime(r_speed, l_speed, duration=duration, wait=False)
-        time.sleep(duration)
+        self.robobo.moveWheelsByTime(r_speed, l_speed, duration=duration, wait=True)
+        time.sleep(.01)
 
         observation = self._get_obs()
         
-        if observation["red_x"] == 0:
+        if observation["x_offset"] == -1:
             self.steps_without_target += 1
         else:
             self.steps_without_target = 0
@@ -65,22 +66,24 @@ class RoboboEnv(gym.Env):
             self.target_pos            
         )
 
-        reward = get_reward(distance, angle, alpha=0.5)
+        reward = get_reward(distance, angle, alpha=0.25)
+
+        print(f"Action: {parse_action(action)} | Reward: {(reward):.3f} | Distance: {(distance):.3f} | Obs: {observation}")
 
         terminated = False
-        if distance <= 50:
+        if distance <= 100:
+            print(f"Target reached!")
             terminated = True
-            reward += 200
+            reward += 500
                 
         info = self._get_info()
         
-        print(f"Action: {parse_action(action)} | Reward: {(reward):.3f} | Distance: {(distance):.3f} | Obs: {observation}")
-
         truncated = False
         if self.steps_without_target >= 15:
             print(f"Too many steps without seeing target!")
             truncated = True
             self.steps_without_target = 0
+            reward -= 100
         
         return observation, reward, terminated, truncated, info
     
@@ -107,8 +110,22 @@ class RoboboEnv(gym.Env):
         self.sim.disconnect()
     
     def _get_obs(self):
+        red_x = np.array([self.robobo.readColorBlob(self.target_color).posx])
+        if 0 < red_x <= 100:
+            x_offset = abs(50 - red_x)
+        else:
+            x_offset = -1
+
+        if 0 < red_x <= 50:
+            sector = 1
+        elif 50 < red_x <= 100:
+            sector = 2
+        else:
+            sector = 0
+        
         return {
-            "red_x": np.array([self.robobo.readColorBlob(self.target_color).posx])
+            "x_offset": np.array([x_offset]),
+            "sector": np.array([sector])
             }
     
     def _get_info(self):

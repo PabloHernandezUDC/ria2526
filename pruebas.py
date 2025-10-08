@@ -15,26 +15,11 @@ rob = Robobo(ip)
 sim.connect()
 rob.connect()
 
+print(sim.getRobots())
 
-
-def get_stuff():
-    r = get_robot_pos(sim)
-    t = get_cylinder_pos(sim)
-    a = get_angle_to_target(r, t)
-
-
-time.sleep(0.5)
-
-get_stuff()
-
-rob.moveWheelsByTime(0, 20, 1.85)
-
-get_stuff()
-
-rob.moveWheelsByTime(-20, -20, 6)
-
-get_stuff()
-
-rob.moveWheelsByTime(20, 0, 1.5)
-
-get_stuff()
+for _ in range(1000):
+    angle = random.random()*360
+    angle = int(round(angle, 0))
+    data = sim.getRobotLocation(0)
+    data["rotation"]["y"] = angle
+    sim.setRobotLocation(0, rotation={})
