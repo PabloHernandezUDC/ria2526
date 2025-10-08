@@ -79,7 +79,7 @@ class RoboboEnv(gym.Env):
         info = self._get_info()
         
         truncated = False
-        if self.steps_without_target >= 15:
+        if self.steps_without_target >= 100:
             print(f"Too many steps without seeing target!")
             truncated = True
             self.steps_without_target = 0
