@@ -7,6 +7,8 @@ from robobosim.RoboboSim import RoboboSim
 from robobopy.utils.BlobColor import BlobColor
 from math import dist
 from stable_baselines3 import PPO
+from stable_baselines3.common.callbacks import EvalCallback
+
 
 class RoboboEnv(gym.Env):
 
@@ -121,7 +123,7 @@ class RoboboEnv(gym.Env):
             sector = red_x // 20
         
         return {
-            "sector": np.array([sector])
+            "sector": np.array([sector], dtype=int).flatten()
             }
     
     def _get_info(self):
@@ -202,25 +204,15 @@ def main():
 
     env = gym.make("RoboboEnv")
     
-    model = PPO("MultiInputPolicy", env, verbose=1) # en el enunciado usa MlpPolicy
-    
+    model = PPO("MultiInputPolicy", env, verbose=1)
     
     start = time.time()
-    model.learn(total_timesteps=8192)
+    model.learn(total_timesteps=8192, progress_bar=True)
     learning_time = time.time() - start
     
     print(f"Training took {(learning_time):.2f} seconds.")
     
     model.save("checkpoint.zip")
-
-    vec_env = model.get_env()
-    obs = vec_env.reset()
-    for i in range(1000):
-        action, _state = model.predict(obs, deterministic=True)
-        obs, reward, done, info = vec_env.step(action)
-        # vec_env.render("human")
-
-
 
 
 if __name__ == "__main__":
