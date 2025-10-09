@@ -7,8 +7,62 @@ from robobosim.RoboboSim import RoboboSim
 from robobopy.utils.BlobColor import BlobColor
 from math import dist
 from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.callbacks import EvalCallback, BaseCallback, CallbackList
+from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.monitor import Monitor
+import matplotlib.pyplot as plt
 
+
+
+seed = 42
+
+
+class CustomCallback(BaseCallback):
+    """
+    A custom callback that derives from ``BaseCallback``.
+
+    :param verbose: Verbosity level: 0 for no output, 1 for info messages, 2 for debug messages
+    """
+    def __init__(self, verbose: int = 0):
+        super().__init__(verbose)
+
+    def _on_training_start(self) -> None:
+        self.rewards = list()
+        self.ep_lengths = list()
+        self.current_episode_rewards = list()
+
+
+    def _on_step(self) -> bool:
+        # Access the info dict from the last step
+        if len(self.locals.get("infos", [])) > 0:
+            info = self.locals["infos"][0]  # For single environment
+            if "step_reward" in info:
+                self.current_episode_rewards.append(info["step_reward"])
+        
+        # Check if episode ended
+        if len(self.locals.get("dones", [])) > 0:
+            if self.locals["dones"][0]:  # Episode finished
+                if self.current_episode_rewards:
+                    self.rewards.append(sum(self.current_episode_rewards))
+                    self.current_episode_rewards = list()
+        
+        return True
+
+
+    def _on_training_end(self) -> None:
+        # Plot the rewards
+        if self.rewards:
+            plt.clf()
+            plt.plot(self.rewards)
+            plt.xlabel("Episode")
+            plt.ylabel("Total Reward")
+            plt.title("Rewards per Episode")
+            plt.savefig("episode_rewards.jpg")
+            plt.close()
+            
+            print(f"\nTotal episodes: {len(self.rewards)}")
+            print(f"Mean reward: {np.mean(self.rewards):.2f}")
+            print(f"Std reward: {np.std(self.rewards):.2f}")
 
 class RoboboEnv(gym.Env):
 
@@ -79,6 +133,7 @@ class RoboboEnv(gym.Env):
             # reward += 200
                 
         info = self._get_info()
+        info["step_reward"] = reward  # Store the reward in info
         
         truncated = False
         if self.steps_without_target >= 35:
@@ -152,15 +207,17 @@ def get_robot_pos(sim: RoboboSim):
     
     return {"x": pos_x, "z": pos_z, "y": rot_y}
 
+
 def get_cylinder_pos(sim: RoboboSim):
     # IMPORTANTE: la posición del cilindro no se actualiza en tiempo real,
-    # solo podemos saber la inicial
+    # solo podemos saber la posición en la que empieza
     data = sim.getObjectLocation("CYLINDERMIDBALL")
 
     pos_x = data["position"]["x"]
     pos_z = data["position"]["z"]
     
     return {"x": pos_x, "z": pos_z}
+
 
 def get_distance_to_target(robot_pos: dict, target_pos: dict):
     rx, rz = robot_pos["x"], robot_pos["z"]
@@ -196,19 +253,56 @@ def get_reward(distance: float, angle: float, alpha: float = 0.5):
 
     return (alpha)*r1 + (1-alpha)*r2
 
+
+def plot_evaluation_results():
+    data = np.load("eval_results/evaluations.npz")
+
+    timesteps = data["timesteps"]
+    rewards = data["results"]
+    ep_lengths = data["ep_lengths"]
+
+    mean_rewards = np.mean(rewards, axis=1)
+    std_rewards = np.std(rewards, axis=1)
+
+    mean_ep_lengths = np.mean(ep_lengths, axis=1)
+    std_ep_lengths = np.std(ep_lengths, axis=1)
+
+    for type, means, stds in (("reward", mean_rewards, std_rewards), ("episode_length", mean_ep_lengths, std_ep_lengths)):
+        plt.clf()
+        plt.errorbar(timesteps, means, yerr=stds, fmt="o-", capsize=4, color="black", ecolor="blue")
+        plt.xticks(timesteps)
+        plt.xlabel("Timesteps")
+        plt.ylabel(f"Mean {type}")
+        plt.suptitle(f"Mean and std. {type} over training")
+        plt.savefig(f"eval_{type}s.jpg")
+
+
 def main():
+    id = "RoboboEnv"
     gym.register(
-        id="RoboboEnv",
+        id=id,
         entry_point=RoboboEnv,
     )
 
-    env = gym.make("RoboboEnv")
+    train_env = Monitor(gym.make(id))
+    model = PPO("MultiInputPolicy", train_env, verbose=1, seed=seed)
     
-    model = PPO("MultiInputPolicy", env, verbose=1)
+    eval_env = Monitor(gym.make(id))
+    eval_callback = EvalCallback(
+        eval_env,
+        log_path="eval_results/",
+        eval_freq=512,
+        n_eval_episodes=5
+    )
+    
+    custom_callback = CustomCallback(verbose=1)
+    callback_list = CallbackList([eval_callback, custom_callback])
     
     start = time.time()
-    model.learn(total_timesteps=8192, progress_bar=True)
+    model.learn(total_timesteps=8192, callback=callback_list, progress_bar=True)
     learning_time = time.time() - start
+    
+    plot_evaluation_results()
     
     print(f"Training took {(learning_time):.2f} seconds.")
     
