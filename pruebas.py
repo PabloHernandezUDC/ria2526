@@ -7,7 +7,7 @@ from robobosim.RoboboSim import RoboboSim
 from robobopy.utils.BlobColor import BlobColor
 from math import dist
 
-from pr1 import *
+from train import *
 
 # ip = "localhost"
 # sim = RoboboSim(ip)

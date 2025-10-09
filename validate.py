@@ -7,7 +7,7 @@ from robobosim.RoboboSim import RoboboSim
 from robobopy.utils.BlobColor import BlobColor
 from math import dist
 from stable_baselines3 import PPO
-from pr1 import *
+from train import *
 
 def main():
     gym.register(
