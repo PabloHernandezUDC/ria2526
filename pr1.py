@@ -15,19 +15,19 @@ class RoboboEnv(gym.Env):
             {
                 # "agent": gym.spaces.Box(-1000, 1000, shape=(3,), dtype=int),   # [x, z] coordinates and [y] rotation
                 # "target": gym.spaces.Box(-1000, 1000, shape=(2,), dtype=int),  # [x, z] coordinates
-                "x_offset": gym.spaces.Box(-1, 100, shape=(1,), dtype=int),
-                "sector": gym.spaces.Discrete(3)
+                # "x_offset": gym.spaces.Box(-1, 100, shape=(1,), dtype=int),
+                "sector": gym.spaces.Discrete(6)
             }
         )
 
-        self.action_space = gym.spaces.Discrete(4)
+        self.action_space = gym.spaces.Discrete(3)
 
         speed = 10
         self._action_to_direction = {
-            0: np.array([speed*3, speed*3]), # Forward
-            1: np.array([0, speed]),         # Turn Left
-            2: np.array([speed, 0]),         # Turn Right
-            3: np.array([-speed, -speed]),   # Go Backwards
+            0: np.array([speed*3, speed*3]),   # Forward
+            1: np.array([0, speed*2]),         # Turn Left
+            2: np.array([speed*2, 0]),         # Turn Right
+            # 3: np.array([-speed, -speed]),   # Go Backwards
         }
         
         ip = "localhost"
@@ -50,7 +50,7 @@ class RoboboEnv(gym.Env):
 
         observation = self._get_obs()
         
-        if observation["x_offset"] == -1:
+        if observation["sector"] == 5:
             self.steps_without_target += 1
         else:
             self.steps_without_target = 0
@@ -66,7 +66,7 @@ class RoboboEnv(gym.Env):
             self.target_pos            
         )
 
-        reward = get_reward(distance, angle, alpha=0.25)
+        reward = get_reward(distance, angle, alpha=0.4)
 
         print(f"Action: {parse_action(action)} | Reward: {(reward):.3f} | Distance: {(distance):.3f} | Obs: {observation}")
 
@@ -74,12 +74,12 @@ class RoboboEnv(gym.Env):
         if distance <= 100:
             print(f"Target reached!")
             terminated = True
-            reward += 500
+            # reward += 200
                 
         info = self._get_info()
         
         truncated = False
-        if self.steps_without_target >= 100:
+        if self.steps_without_target >= 35:
             print(f"Too many steps without seeing target!")
             truncated = True
             self.steps_without_target = 0
@@ -113,20 +113,14 @@ class RoboboEnv(gym.Env):
     
     def _get_obs(self):
         red_x = np.array([self.robobo.readColorBlob(self.target_color).posx])
-        if 0 < red_x <= 100:
-            x_offset = abs(50 - red_x)
+        if red_x == 0:
+            sector = 5
+        elif red_x == 100:
+            sector = 4 # para corregir y que el 100 no se quede solo en el sector 5
         else:
-            x_offset = -1
-
-        if 0 < red_x <= 50:
-            sector = 1
-        elif 50 < red_x <= 100:
-            sector = 2
-        else:
-            sector = 0
+            sector = red_x // 20
         
         return {
-            "x_offset": np.array([x_offset]),
             "sector": np.array([sector])
             }
     

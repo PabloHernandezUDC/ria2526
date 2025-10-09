@@ -9,17 +9,20 @@ from math import dist
 
 from pr1 import *
 
-ip = "localhost"
-sim = RoboboSim(ip)
-rob = Robobo(ip)
-sim.connect()
-rob.connect()
+# ip = "localhost"
+# sim = RoboboSim(ip)
+# rob = Robobo(ip)
+# sim.connect()
+# rob.connect()
 
-print(sim.getRobots())
+# print(sim.getRobots())
 
-for _ in range(1000):
-    angle = random.random()*360
-    angle = int(round(angle, 0))
-    data = sim.getRobotLocation(0)
-    data["rotation"]["y"] = angle
-    sim.setRobotLocation(0, rotation={})
+# for _ in range(1000):
+#     angle = random.random()*360
+#     angle = int(round(angle, 0))
+#     data = sim.getRobotLocation(0)
+#     data["rotation"]["y"] = angle
+#     sim.setRobotLocation(0, rotation={})
+
+for i in range(1, 101):
+    print(i, i // 20)
