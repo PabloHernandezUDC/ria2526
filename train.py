@@ -57,14 +57,36 @@ class CustomCallback(BaseCallback):
 
 
     def _on_training_end(self) -> None:
-        # Plot the rewards
+        # Plot the rewards with moving average
         if self.rewards:
             plt.clf()
-            plt.plot(self.rewards)
-            plt.xlabel("Episode")
-            plt.ylabel("Total Reward")
-            plt.title("Rewards per Episode")
-            plt.savefig("episode_rewards.jpg")
+            fig, ax = plt.subplots(figsize=(12, 6))
+            
+            # Plot raw rewards
+            episodes = np.arange(len(self.rewards))
+            ax.plot(episodes, self.rewards, alpha=0.3, label='Episode Reward', color='blue')
+            
+            # Calculate and plot moving average
+            window_size = 10
+            if len(self.rewards) >= window_size:
+                moving_avg = []
+                for i in range(len(self.rewards)):
+                    if i < window_size - 1:
+                        # For early episodes, use average of all episodes so far
+                        moving_avg.append(np.mean(self.rewards[:i+1]))
+                    else:
+                        # Use last 10 episodes
+                        moving_avg.append(np.mean(self.rewards[i-window_size+1:i+1]))
+                
+                ax.plot(episodes, moving_avg, linewidth=2, label=f'Moving Average (last {window_size} episodes)', color='red')
+            
+            ax.set_xlabel("Episode")
+            ax.set_ylabel("Total Reward")
+            ax.set_title("Rewards per Episode with Moving Average")
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+            plt.tight_layout()
+            plt.savefig("plots/episode_rewards.jpg")
             plt.close()
             
             print(f"\nTotal episodes: {len(self.rewards)}")
@@ -92,7 +114,9 @@ class CustomCallback(BaseCallback):
                     # Plot the trail
                     ax.plot(xs, zs, '-', color=color, alpha=0.6, linewidth=1)
                     # Mark start position
-                    ax.plot(xs[0], zs[0], 'o', color=color, markersize=4, alpha=0.8)
+                    ax.plot(xs[0], zs[0], 'o', color="black", markersize=4, alpha=1)
+                    # Mark end position
+                    ax.plot(xs[-1], zs[-1], 'o', color="black", markersize=4, alpha=1)
             
             ax.set_xlim(-1000, 1000)
             ax.set_ylim(-1000, 1000)
@@ -102,7 +126,7 @@ class CustomCallback(BaseCallback):
             ax.grid(True, alpha=0.3)
             ax.set_aspect('equal')
             
-            plt.savefig("robot_trajectories.jpg", dpi=150)
+            plt.savefig("plots/robot_trajectories.jpg", dpi=150)
             plt.close()
             
             print(f"Saved trajectory plot with {num_episodes} episodes")
@@ -313,12 +337,15 @@ def plot_evaluation_results():
 
     for type, means, stds in (("reward", mean_rewards, std_rewards), ("episode_length", mean_ep_lengths, std_ep_lengths)):
         plt.clf()
-        plt.errorbar(timesteps, means, yerr=stds, fmt="o-", capsize=4, color="black", ecolor="blue")
-        plt.xticks(timesteps)
-        plt.xlabel("Timesteps")
-        plt.ylabel(f"Mean {type}")
-        plt.suptitle(f"Mean and std. {type} over training")
-        plt.savefig(f"eval_{type}s.jpg")
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.errorbar(timesteps, means, yerr=stds, fmt="o-", capsize=4, color="black", ecolor="blue")
+        ax.set_xticks(timesteps)
+        ax.set_xlabel("Timesteps")
+        ax.set_ylabel(f"Mean {type}")
+        fig.suptitle(f"Mean and std. {type} over training")
+        plt.tight_layout()
+        plt.savefig(f"plots/eval_{type}s.jpg")
+        plt.close()
 
 
 def main():
