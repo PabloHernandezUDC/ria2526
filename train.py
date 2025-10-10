@@ -30,6 +30,8 @@ class CustomCallback(BaseCallback):
         self.rewards = list()
         self.ep_lengths = list()
         self.current_episode_rewards = list()
+        self.positions = list()  # List of episodes, each episode is a list of (x, z) positions
+        self.current_episode_positions = list()
 
 
     def _on_step(self) -> bool:
@@ -38,6 +40,8 @@ class CustomCallback(BaseCallback):
             info = self.locals["infos"][0]  # For single environment
             if "step_reward" in info:
                 self.current_episode_rewards.append(info["step_reward"])
+            if "robot_pos" in info:
+                self.current_episode_positions.append((info["robot_pos"]["x"], info["robot_pos"]["z"]))
         
         # Check if episode ended
         if len(self.locals.get("dones", [])) > 0:
@@ -45,6 +49,9 @@ class CustomCallback(BaseCallback):
                 if self.current_episode_rewards:
                     self.rewards.append(sum(self.current_episode_rewards))
                     self.current_episode_rewards = list()
+                if self.current_episode_positions:
+                    self.positions.append(self.current_episode_positions.copy())
+                    self.current_episode_positions = list()
         
         return True
 
@@ -63,6 +70,42 @@ class CustomCallback(BaseCallback):
             print(f"\nTotal episodes: {len(self.rewards)}")
             print(f"Mean reward: {np.mean(self.rewards):.2f}")
             print(f"Std reward: {np.std(self.rewards):.2f}")
+        
+        # Plot the robot trajectories
+        if self.positions:
+            plt.clf()
+            fig, ax = plt.subplots(figsize=(10, 10))
+            
+            num_episodes = len(self.positions)
+            
+            # Create color gradient from red to green
+            for i, episode_positions in enumerate(self.positions):
+                if len(episode_positions) > 0:
+                    # Calculate color: red (1, 0, 0) -> green (0, 1, 0)
+                    ratio = i / max(1, num_episodes - 1)  # Avoid division by zero
+                    color = (1 - ratio, ratio, 0)  # RGB: red to green
+                    
+                    # Extract x and z coordinates
+                    xs = [pos[0] for pos in episode_positions]
+                    zs = [pos[1] for pos in episode_positions]
+                    
+                    # Plot the trail
+                    ax.plot(xs, zs, '-', color=color, alpha=0.6, linewidth=1)
+                    # Mark start position
+                    ax.plot(xs[0], zs[0], 'o', color=color, markersize=4, alpha=0.8)
+            
+            ax.set_xlim(-1000, 1000)
+            ax.set_ylim(-1000, 1000)
+            ax.set_xlabel("X Position")
+            ax.set_ylabel("Z Position")
+            ax.set_title(f"Robot Trajectories (Red=Early Episodes, Green=Late Episodes)")
+            ax.grid(True, alpha=0.3)
+            ax.set_aspect('equal')
+            
+            plt.savefig("robot_trajectories.jpg", dpi=150)
+            plt.close()
+            
+            print(f"Saved trajectory plot with {num_episodes} episodes")
 
 class RoboboEnv(gym.Env):
 
@@ -134,6 +177,7 @@ class RoboboEnv(gym.Env):
                 
         info = self._get_info()
         info["step_reward"] = reward  # Store the reward in info
+        info["robot_pos"] = get_robot_pos(self.sim)  # Store robot position
         
         truncated = False
         if self.steps_without_target >= 35:
@@ -285,7 +329,13 @@ def main():
     )
 
     train_env = Monitor(gym.make(id))
-    model = PPO("MultiInputPolicy", train_env, verbose=1, seed=seed)
+    model = PPO(
+        "MultiInputPolicy",
+        train_env,
+        verbose=1,
+        seed=seed,
+        n_steps=512,
+        )
     
     eval_env = Monitor(gym.make(id))
     eval_callback = EvalCallback(
@@ -312,3 +362,42 @@ def main():
 if __name__ == "__main__":
     main()
 
+'''
+Eval num_timesteps=8192, episode_reward=23.05 +/- 6.47
+Episode length: 21.60 +/- 12.63
+-------------------------------------------
+| eval/                   |               |
+|    mean_ep_length       | 21.6          |
+|    mean_reward          | 23.1          |
+| time/                   |               |
+|    total_timesteps      | 8192          |
+| train/                  |               |
+|    approx_kl            | 0.00034337933 |
+|    clip_fraction        | 0             |
+|    clip_range           | 0.2           |
+|    entropy_loss         | -0.763        |
+|    explained_variance   | -0.0815       |
+|    learning_rate        | 0.0003        |
+|    loss                 | 101           |
+|    n_updates            | 150           |
+|    policy_gradient_loss | -0.00138      |
+|    value_loss           | 226           |
+-------------------------------------------
+---------------------------------
+| rollout/           |          |
+|    ep_len_mean     | 54.9     |
+|    ep_rew_mean     | -24.1    |
+| time/              |          |
+|    fps             | 3        |
+|    iterations      | 16       |
+|    time_elapsed    | 2568     |
+|    total_timesteps | 8192     |
+---------------------------------
+
+Total episodes: 171
+Mean reward: 3.95
+Std reward: 23.20
+Saved trajectory plot with 171 episodes
+ 100% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 8,192/8,192  [ 0:42:47 < 0:00:00 , 0 it/s ]
+Training took 2570.14 seconds.
+'''
