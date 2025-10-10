@@ -32,6 +32,7 @@ class CustomCallback(BaseCallback):
         self.current_episode_rewards = list()
         self.positions = list()  # List of episodes, each episode is a list of (x, z) positions
         self.current_episode_positions = list()
+        self.episode_outcomes = list()  # Track if episode was 'terminated', 'truncated', or 'other'
 
 
     def _on_step(self) -> bool:
@@ -44,14 +45,27 @@ class CustomCallback(BaseCallback):
                 self.current_episode_positions.append((info["robot_pos"]["x"], info["robot_pos"]["z"]))
         
         # Check if episode ended
-        if len(self.locals.get("dones", [])) > 0:
-            if self.locals["dones"][0]:  # Episode finished
-                if self.current_episode_rewards:
-                    self.rewards.append(sum(self.current_episode_rewards))
-                    self.current_episode_rewards = list()
-                if self.current_episode_positions:
-                    self.positions.append(self.current_episode_positions.copy())
-                    self.current_episode_positions = list()
+        dones = self.locals.get("dones", [])
+        if len(dones) > 0 and dones[0]:  # Episode finished
+            if self.current_episode_rewards:
+                self.rewards.append(sum(self.current_episode_rewards))
+                self.current_episode_rewards = list()
+            if self.current_episode_positions:
+                self.positions.append(self.current_episode_positions.copy())
+                self.current_episode_positions = list()
+            
+            # Determine outcome using our custom flags in info
+            infos = self.locals.get("infos", [])
+            if len(infos) > 0:
+                info = infos[0]
+                if info.get("is_truncated", False):
+                    self.episode_outcomes.append('truncated')
+                elif info.get("is_terminated", False):
+                    self.episode_outcomes.append('terminated')
+                else:
+                    self.episode_outcomes.append('other')
+            else:
+                self.episode_outcomes.append('other')
         
         return True
 
@@ -113,10 +127,18 @@ class CustomCallback(BaseCallback):
                     
                     # Plot the trail
                     ax.plot(xs, zs, '-', color=color, alpha=0.6, linewidth=1)
-                    # Mark start position
-                    ax.plot(xs[0], zs[0], 'o', color="black", markersize=4, alpha=1)
-                    # Mark end position
-                    ax.plot(xs[-1], zs[-1], 'o', color="black", markersize=4, alpha=1)
+                    # Mark end position with different markers based on outcome
+                    if i < len(self.episode_outcomes):
+                        outcome = self.episode_outcomes[i]
+                        if outcome == 'terminated':
+                            # Star for successful termination (target found)
+                            ax.plot(xs[-1], zs[-1], '*', color="gold", markersize=12, alpha=1, markeredgecolor='black', markeredgewidth=0.5)
+                        elif outcome == 'truncated':
+                            # X for truncated episode
+                            ax.plot(xs[-1], zs[-1], 'x', color="red", markersize=8, alpha=1, markeredgewidth=2)
+                    else:
+                        # Default marker if outcome not tracked
+                        ax.plot(xs[-1], zs[-1], 'o', color="black", markersize=4, alpha=1)
             
             ax.set_xlim(-1000, 1000)
             ax.set_ylim(-1000, 1000)
@@ -125,6 +147,15 @@ class CustomCallback(BaseCallback):
             ax.set_title(f"Robot Trajectories (Red=Early Episodes, Green=Late Episodes)")
             ax.grid(True, alpha=0.3)
             ax.set_aspect('equal')
+            
+            # Add legend for markers
+            from matplotlib.lines import Line2D
+            legend_elements = [
+                # Line2D([0], [0], marker='o', color='w', markerfacecolor='black', markersize=6, label='Start'),
+                Line2D([0], [0], marker='*', color='w', markerfacecolor='gold', markeredgecolor='black', markersize=10, label='Target Found'),
+                Line2D([0], [0], marker='x', color='w', markerfacecolor='red', markeredgecolor='red', markersize=8, label='Truncated', markeredgewidth=2)
+            ]
+            ax.legend(handles=legend_elements, loc='upper right')
             
             plt.savefig("plots/robot_trajectories.jpg", dpi=150)
             plt.close()
@@ -209,6 +240,9 @@ class RoboboEnv(gym.Env):
             truncated = True
             self.steps_without_target = 0
             reward -= 100
+        
+        info["is_truncated"] = truncated  # Explicitly store truncation status
+        info["is_terminated"] = terminated  # Explicitly store termination status
         
         return observation, reward, terminated, truncated, info
     
@@ -376,7 +410,10 @@ def main():
     callback_list = CallbackList([eval_callback, custom_callback])
     
     start = time.time()
-    model.learn(total_timesteps=8192, callback=callback_list, progress_bar=True)
+    model.learn(
+        total_timesteps=8192,
+        callback=callback_list,
+        progress_bar=True)
     learning_time = time.time() - start
     
     plot_evaluation_results()
@@ -390,42 +427,42 @@ if __name__ == "__main__":
     main()
 
 '''
-Eval num_timesteps=8192, episode_reward=-24.96 +/- 49.44
-Episode length: 24.80 +/- 11.12
-------------------------------------------
-| eval/                   |              |
-|    mean_ep_length       | 24.8         |
-|    mean_reward          | -25          |
-| time/                   |              |
-|    total_timesteps      | 8192         |
-| train/                  |              |
-|    approx_kl            | 0.0062855026 |
-|    clip_fraction        | 0.0854       |
-|    clip_range           | 0.2          |
-|    entropy_loss         | -0.9         |
-|    explained_variance   | 0.0434       |
-|    learning_rate        | 0.0003       |
-|    loss                 | 546          |
-|    n_updates            | 150          |
-|    policy_gradient_loss | -0.00604     |
-|    value_loss           | 1.04e+03     |
-------------------------------------------
+Eval num_timesteps=8192, episode_reward=-41.85 +/- 57.44
+Episode length: 45.00 +/- 37.09
+----------------------------------------
+| eval/                   |            |
+|    mean_ep_length       | 45         |
+|    mean_reward          | -41.9      |
+| time/                   |            |
+|    total_timesteps      | 8192       |
+| train/                  |            |
+|    approx_kl            | 0.00653598 |
+|    clip_fraction        | 0.0318     |
+|    clip_range           | 0.2        |
+|    entropy_loss         | -0.68      |
+|    explained_variance   | 0.0127     |
+|    learning_rate        | 0.0003     |
+|    loss                 | 230        |
+|    n_updates            | 150        |
+|    policy_gradient_loss | -0.00374   |
+|    value_loss           | 848        |
+----------------------------------------
 ---------------------------------
 | rollout/           |          |
-|    ep_len_mean     | 50.8     |
-|    ep_rew_mean     | -56.7    |
+|    ep_len_mean     | 46       |
+|    ep_rew_mean     | -64.2    |
 | time/              |          |
 |    fps             | 2        |
 |    iterations      | 16       |
-|    time_elapsed    | 2745     |
+|    time_elapsed    | 3015     |
 |    total_timesteps | 8192     |
 ---------------------------------
 
-Total episodes: 179
-Mean reward: -0.47
-Std reward: 17.55
-Saved trajectory plot with 179 episodes
- 100% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 8,192/8,192  [ 0:45:45 < 0:00:00 , ? it/s ]
-Training took 2746.97 seconds.
+Total episodes: 194
+Mean reward: -0.12
+Std reward: 17.28
+Saved trajectory plot with 194 episodes
+ 100% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 8,192/8,192  [ 0:50:15 < 0:00:00 , ? it/s ]
+Training took 3017.38 seconds.
 
 '''
