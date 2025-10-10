@@ -390,41 +390,42 @@ if __name__ == "__main__":
     main()
 
 '''
-Eval num_timesteps=8192, episode_reward=23.05 +/- 6.47
-Episode length: 21.60 +/- 12.63
--------------------------------------------
-| eval/                   |               |
-|    mean_ep_length       | 21.6          |
-|    mean_reward          | 23.1          |
-| time/                   |               |
-|    total_timesteps      | 8192          |
-| train/                  |               |
-|    approx_kl            | 0.00034337933 |
-|    clip_fraction        | 0             |
-|    clip_range           | 0.2           |
-|    entropy_loss         | -0.763        |
-|    explained_variance   | -0.0815       |
-|    learning_rate        | 0.0003        |
-|    loss                 | 101           |
-|    n_updates            | 150           |
-|    policy_gradient_loss | -0.00138      |
-|    value_loss           | 226           |
--------------------------------------------
+Eval num_timesteps=8192, episode_reward=-24.96 +/- 49.44
+Episode length: 24.80 +/- 11.12
+------------------------------------------
+| eval/                   |              |
+|    mean_ep_length       | 24.8         |
+|    mean_reward          | -25          |
+| time/                   |              |
+|    total_timesteps      | 8192         |
+| train/                  |              |
+|    approx_kl            | 0.0062855026 |
+|    clip_fraction        | 0.0854       |
+|    clip_range           | 0.2          |
+|    entropy_loss         | -0.9         |
+|    explained_variance   | 0.0434       |
+|    learning_rate        | 0.0003       |
+|    loss                 | 546          |
+|    n_updates            | 150          |
+|    policy_gradient_loss | -0.00604     |
+|    value_loss           | 1.04e+03     |
+------------------------------------------
 ---------------------------------
 | rollout/           |          |
-|    ep_len_mean     | 54.9     |
-|    ep_rew_mean     | -24.1    |
+|    ep_len_mean     | 50.8     |
+|    ep_rew_mean     | -56.7    |
 | time/              |          |
-|    fps             | 3        |
+|    fps             | 2        |
 |    iterations      | 16       |
-|    time_elapsed    | 2568     |
+|    time_elapsed    | 2745     |
 |    total_timesteps | 8192     |
 ---------------------------------
 
-Total episodes: 171
-Mean reward: 3.95
-Std reward: 23.20
-Saved trajectory plot with 171 episodes
- 100% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 8,192/8,192  [ 0:42:47 < 0:00:00 , 0 it/s ]
-Training took 2570.14 seconds.
+Total episodes: 179
+Mean reward: -0.47
+Std reward: 17.55
+Saved trajectory plot with 179 episodes
+ 100% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 8,192/8,192  [ 0:45:45 < 0:00:00 , ? it/s ]
+Training took 2746.97 seconds.
+
 '''
