@@ -1,0 +1,18 @@
+======================================================================
+ESTADÍSTICAS DE VALIDACIÓN
+======================================================================
+Número de episodios:           10
+Episodios exitosos:            10 (100.0%)
+
+Recompensas:
+  Media:                       26.45 ± 6.76
+  Mínima:                      14.05
+  Máxima:                      38.51
+  Mediana:                     27.65
+
+Longitud de episodios:
+  Media:                       26.6 ± 6.8 pasos
+
+Distancia final al objetivo:
+  Media:                       80.79 ± 9.73
+======================================================================
