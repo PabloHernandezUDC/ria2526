@@ -31,9 +31,12 @@ class RoboboEnv(gym.Env):
         
     Action Space:
         Discrete(3): 0=forward, 1=turn left, 2=turn right
+    
+    Args:
+        verbose: If True, prints step information (default: True)
     """
 
-    def __init__(self):
+    def __init__(self, verbose=True):
         # Observation space: visual sector (0-5)
         self.observation_space = gym.spaces.Dict(
             {
@@ -62,6 +65,7 @@ class RoboboEnv(gym.Env):
         self.target_pos = get_cylinder_pos(self.sim)
         self.target_color = BlobColor.RED
         self.steps_without_target = 0
+        self.verbose = verbose
 
     def step(self, action):
         """
@@ -106,14 +110,16 @@ class RoboboEnv(gym.Env):
         # Calculate reward
         reward = get_reward(distance, angle, alpha=0.4)
 
-        print(
-            f"Action: {parse_action(action)} | Reward: {(reward):.3f} | Distance: {(distance):.3f} | Obs: {observation}")
+        if self.verbose:
+            print(f"Action: {parse_action(action)} | Reward: {(reward):.3f} | Distance: {(distance):.3f} | Obs: {observation}")
 
         # Check if target reached
         terminated = False
         if distance <= 100:
-            print(f"Target reached!")
+            if self.verbose:
+                print(f"Target reached!")
             terminated = True
+            reward += 90
 
         # Store additional information
         info = self._get_info()
@@ -123,7 +129,8 @@ class RoboboEnv(gym.Env):
         # Check truncation (lost target for too long)
         truncated = False
         if self.steps_without_target >= 35:
-            print(f"Too many steps without seeing target!")
+            if self.verbose:
+                print(f"Too many steps without seeing target!")
             truncated = True
             self.steps_without_target = 0
             reward -= 100
@@ -145,7 +152,8 @@ class RoboboEnv(gym.Env):
             observation: Initial observation
             info: Additional information dictionary
         """
-        print("Resetting env...")
+        if self.verbose:
+            print("Resetting env...")
 
         self.sim.resetSimulation()
         self.robobo.stopMotors()

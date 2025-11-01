@@ -126,6 +126,7 @@ def get_reward(distance: float, angle: float, alpha: float = 0.5):
         Combined reward value
     """
     r1 = 1000 / distance
+    r1 = min(5, r1)
     r2 = -(abs(angle) / 90)
 
     return (alpha) * r1 + (1 - alpha) * r2
