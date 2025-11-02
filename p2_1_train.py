@@ -107,7 +107,7 @@ def main(config_file):
     print("\n*** Starting NEAT evolution ***")
     start_time = time.time()
     
-    winner = p.run(eval_genomes, 5)
+    winner = p.run(eval_genomes, 10)
     
     training_time = time.time() - start_time
     print(f"\n*** Training completed in {training_time:.2f} seconds ***")
