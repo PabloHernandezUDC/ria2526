@@ -71,49 +71,6 @@ def eval_genomes(genomes, config):
     env.close()
 
 
-def run_best_genome(genome, config):
-    """
-    Run the best genome to visualize performance.
-    
-    Args:
-        genome: Best genome from evolution
-        config: NEAT configuration object
-    """
-    print("\n*** Running best genome ***")
-    
-    id = "RoboboEnv"
-    env = gym.make(id, verbose=False)  # Verbose for final evaluation
-    net = neat.nn.FeedForwardNetwork.create(genome, config)
-    
-    num_episodes = 5
-    for episode in range(num_episodes):
-        obs, info = env.reset()
-        episode_reward = 0.0
-        done = False
-        steps = 0
-        
-        print(f"\nEpisode {episode + 1}")
-        while not done and steps < 200:
-            sector = obs["sector"][0]
-            nn_input = [0.0] * 6
-            if sector < 6:
-                nn_input[sector] = 1.0
-            
-            output = net.activate(nn_input)
-            action = np.argmax([output[0] < 0.33, 
-                               0.33 <= output[0] < 0.67, 
-                               output[0] >= 0.67])
-            
-            obs, reward, terminated, truncated, info = env.step(action)
-            episode_reward += reward
-            done = terminated or truncated
-            steps += 1
-        
-        print(f"Episode {episode + 1} reward: {episode_reward:.2f}, steps: {steps}")
-    
-    env.close()
-
-
 def main(config_file):
     """
     Main training function for NEAT algorithm.
@@ -181,8 +138,7 @@ def main(config_file):
                           filename="plots/2_1_neat_species.svg")
     print('Statistics plotted in plots/')
 
-    # Run the best genome
-    run_best_genome(winner, config)
+    print('\n*** Training complete! Run p2_1_validate.py to evaluate the winner. ***')
 
 
 if __name__ == "__main__":
