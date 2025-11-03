@@ -34,9 +34,10 @@ class RoboboEnv(gym.Env):
     
     Args:
         verbose: If True, prints step information (default: True)
+        target_name: Name of the target object in simulator (default: "CYLINDERMIDBALL")
     """
 
-    def __init__(self, verbose=True):
+    def __init__(self, verbose=True, target_name="CYLINDERMIDBALL"):
         # Observation space: visual sector (0-5) + IR sensor sectors (0-3)
         self.observation_space = gym.spaces.Dict(
             {
@@ -63,7 +64,8 @@ class RoboboEnv(gym.Env):
         self.robobo.connect()
         self.sim.connect()
 
-        self.target_pos = get_cylinder_pos(self.sim)
+        self.target_name = target_name
+        self.target_pos = get_cylinder_pos(self.sim, self.target_name)
         self.target_color = BlobColor.RED
         self.steps_without_target = 0
         self.verbose = verbose
@@ -164,7 +166,7 @@ class RoboboEnv(gym.Env):
         observation = self._get_obs()
         info = self._get_info()
 
-        self.target_pos = get_cylinder_pos(self.sim)
+        self.target_pos = get_cylinder_pos(self.sim, self.target_name)
 
         return observation, info
 

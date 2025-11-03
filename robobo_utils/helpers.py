@@ -46,17 +46,18 @@ def get_robot_pos(sim: RoboboSim):
     return {"x": pos_x, "z": pos_z, "y": rot_y}
 
 
-def get_cylinder_pos(sim: RoboboSim):
+def get_cylinder_pos(sim: RoboboSim, target_name: str = "CYLINDERMIDBALL"):
     """
     Get position of the target cylinder.
     
     Args:
         sim: RoboboSim instance
+        target_name: Name of the target object in simulator (default: "CYLINDERMIDBALL")
         
     Returns:
         Dictionary with x, z positions of the cylinder
     """
-    data = sim.getObjectLocation("CYLINDERMIDBALL")
+    data = sim.getObjectLocation(target_name)
 
     pos_x = data["position"]["x"]
     pos_z = data["position"]["z"]
