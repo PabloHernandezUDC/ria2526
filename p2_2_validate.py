@@ -32,7 +32,7 @@ def run_best_genome(genome, config, num_episodes=5, verbose=True):
         obs, info = env.reset()
         
         # Set robot to custom starting position
-        env.unwrapped.sim.setRoboboPosition({'x': -1000.0, 'y': 39.0, 'z': -400.0}, 0)
+        env.unwrapped.sim.setRobotLocation(0, position={'x': -1000.0, 'y': 39.0, 'z': -400.0})
         time.sleep(0.1)
         
         episode_reward = 0.0
