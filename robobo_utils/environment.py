@@ -1,13 +1,10 @@
-"""
-Custom Gymnasium environment for Robobo robot navigation.
-"""
-
 import time
 import numpy as np
 import gymnasium as gym
 from robobopy.Robobo import Robobo
 from robobosim.RoboboSim import RoboboSim
 from robobopy.utils.BlobColor import BlobColor
+from robobopy.utils.IR import IR
 
 from .helpers import (
     get_robot_pos,
@@ -24,10 +21,13 @@ class RoboboEnv(gym.Env):
     Custom Gymnasium environment for Robobo robot.
     
     The robot must navigate towards a red cylinder visible using only
-    visual information (sector of the field of view where the target appears).
+    visual information (sector of the field of view where the target appears)
+    and IR sensor information (discretized into distance sectors).
     
     Observation Space:
-        Dict with "sector" key: Discrete(6) representing visual sectors (0-5)
+        Dict with keys:
+            - "sector": Discrete(6) representing visual sectors (0-5)
+            - "ir_front": Discrete(4) representing front IR distance (0=far, 3=very close)
         
     Action Space:
         Discrete(3): 0=forward, 1=turn left, 2=turn right
@@ -37,10 +37,11 @@ class RoboboEnv(gym.Env):
     """
 
     def __init__(self, verbose=True):
-        # Observation space: visual sector (0-5)
+        # Observation space: visual sector (0-5) + IR sensor sectors (0-3)
         self.observation_space = gym.spaces.Dict(
             {
-                "sector": gym.spaces.Discrete(6)
+                "sector": gym.spaces.Discrete(6),
+                "ir_front": gym.spaces.Discrete(4)
             }
         )
 
@@ -181,7 +182,8 @@ class RoboboEnv(gym.Env):
         Get current observation from environment.
         
         Returns:
-            Dictionary with "sector" key indicating where target is visible
+            Dictionary with "sector" and "ir_front" keys indicating where 
+            target is visible and front obstacle proximity
         """
         red_x = np.array([self.robobo.readColorBlob(self.target_color).posx])
         if red_x == 0:
@@ -191,8 +193,25 @@ class RoboboEnv(gym.Env):
         else:
             sector = red_x // 20
 
+        ir_sensors = self.robobo.readAllIRSensor()
+        
+        if ir_sensors:
+            front_c_ir = ir_sensors.get(IR.FrontC.value, 0)
+            
+            if front_c_ir < 10:
+                ir_sector = 0
+            elif front_c_ir < 25:
+                ir_sector = 1
+            elif front_c_ir < 50:
+                ir_sector = 2
+            else:
+                ir_sector = 3
+        else:
+            ir_sector = 0
+
         return {
-            "sector": np.array([sector], dtype=int).flatten()
+            "sector": np.array([sector], dtype=int).flatten(),
+            "ir_front": np.array([ir_sector], dtype=int).flatten()
         }
 
     def _get_info(self):
