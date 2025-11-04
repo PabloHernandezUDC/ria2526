@@ -54,8 +54,8 @@ class RoboboEnv(gym.Env):
         speed = 10
         self._action_to_direction = {
             0: np.array([speed*3, speed*3]),   # Forward
-            1: np.array([0, speed*2]),         # Turn Left
-            2: np.array([speed*2, 0]),         # Turn Right
+            1: np.array([0, speed]),         # Turn Left
+            2: np.array([speed, 0]),         # Turn Right
         }
 
         # Connect to RoboboSim

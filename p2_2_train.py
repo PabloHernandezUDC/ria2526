@@ -20,7 +20,7 @@ def eval_genomes(genomes, config):
     """
     # Create environment with verbose=False to reduce output
     id = "RoboboEnv"
-    env = gym.make(id, verbose=False, target_name="CYLINDERBALL", alpha=0.5)
+    env = gym.make(id, verbose=False, target_name="CYLINDERBALL", alpha=0.35)
     
     for genome_id, genome in genomes:
         genome.fitness = 0.0
@@ -112,7 +112,7 @@ def main(config_file):
     print("\n*** Starting NEAT evolution ***")
     start_time = time.time()
     
-    winner = p.run(eval_genomes, 10)
+    winner = p.run(eval_genomes, 20)
     
     training_time = time.time() - start_time
     print(f"\n*** Training completed in {training_time:.2f} seconds ***")
