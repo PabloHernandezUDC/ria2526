@@ -4,7 +4,7 @@
 fitness_criterion      = max
 fitness_threshold      = 9999
 no_fitness_termination = False
-pop_size               = 5
+pop_size               = 10
 reset_on_extinction    = False
 
 [DefaultGenome]
@@ -34,7 +34,7 @@ enabled_rate_to_true_add           = 0.0
 feed_forward                       = True
 node_add_prob                      = 0.2
 node_delete_prob                   = 0.2
-num_hidden                         = 4
+num_hidden                         = 0
 num_inputs                         = 10
 num_outputs                        = 1
 response_init_mean                 = 1.0
