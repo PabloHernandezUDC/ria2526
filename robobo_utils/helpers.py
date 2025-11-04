@@ -57,10 +57,15 @@ def get_cylinder_pos(sim: RoboboSim, target_name: str = "CYLINDERMIDBALL"):
     Returns:
         Dictionary with x, z positions of the cylinder
     """
-    data = sim.getObjectLocation(target_name)
-
-    pos_x = data["position"]["x"]
-    pos_z = data["position"]["z"]
+    print(f"Getting location of object {target_name}...")
+    try:
+        data = sim.getObjectLocation(target_name)
+        pos_x = data["position"]["x"]
+        pos_z = data["position"]["z"]
+    except TypeError:
+        print("We have objects", sim.getObjects())
+        quit()
+    
 
     return {"x": pos_x, "z": pos_z}
 

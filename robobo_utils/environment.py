@@ -35,9 +35,10 @@ class RoboboEnv(gym.Env):
     Args:
         verbose: If True, prints step information (default: True)
         target_name: Name of the target object in simulator (default: "CYLINDERMIDBALL")
+        alpha: Weight for angle vs distance in reward calculation (default: 0.4)
     """
 
-    def __init__(self, verbose=True, target_name="CYLINDERMIDBALL"):
+    def __init__(self, verbose=True, target_name="CYLINDERMIDBALL", alpha=0.4):
         # Observation space: visual sector (0-5) + IR sensor sectors (0-3)
         self.observation_space = gym.spaces.Dict(
             {
@@ -69,6 +70,7 @@ class RoboboEnv(gym.Env):
         self.target_color = BlobColor.RED
         self.steps_without_target = 0
         self.verbose = verbose
+        self.alpha = alpha
 
     def step(self, action):
         """
@@ -111,7 +113,7 @@ class RoboboEnv(gym.Env):
         )
 
         # Calculate reward
-        reward = get_reward(distance, angle, alpha=0.4)
+        reward = get_reward(distance, angle, alpha=self.alpha)
 
         if self.verbose:
             print(f"Action: {parse_action(action)} | Reward: {(reward):.3f} | Distance: {(distance):.3f} | Obs: {observation}")
@@ -166,7 +168,7 @@ class RoboboEnv(gym.Env):
         observation = self._get_obs()
         info = self._get_info()
 
-        self.target_pos = get_cylinder_pos(self.sim, self.target_name)
+        # self.target_pos = get_cylinder_pos(self.sim, self.target_name)
 
         return observation, info
 
@@ -198,13 +200,21 @@ class RoboboEnv(gym.Env):
         ir_sensors = self.robobo.readAllIRSensor()
         
         if ir_sensors:
-            front_c_ir = ir_sensors.get(IR.FrontC.value, 0)
+            # Average the front IR sensors (FrontLL, FrontL, FrontC, FrontR, FrontRR)
+            front_values = [
+                ir_sensors.get(IR.FrontLL.value, 0),
+                ir_sensors.get(IR.FrontL.value, 0),
+                ir_sensors.get(IR.FrontC.value, 0),
+                ir_sensors.get(IR.FrontR.value, 0),
+                ir_sensors.get(IR.FrontRR.value, 0)
+            ]
+            avg_front_ir = np.mean(front_values)
             
-            if front_c_ir < 10:
+            if avg_front_ir < 10:
                 ir_sector = 0
-            elif front_c_ir < 25:
+            elif avg_front_ir < 25:
                 ir_sector = 1
-            elif front_c_ir < 50:
+            elif avg_front_ir < 50:
                 ir_sector = 2
             else:
                 ir_sector = 3

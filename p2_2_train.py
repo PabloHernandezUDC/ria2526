@@ -20,14 +20,14 @@ def eval_genomes(genomes, config):
     """
     # Create environment with verbose=False to reduce output
     id = "RoboboEnv"
-    env = gym.make(id, verbose=False, target_name="CYLINDERBALL")
+    env = gym.make(id, verbose=False, target_name="CYLINDERBALL", alpha=0.75)
     
     for genome_id, genome in genomes:
         genome.fitness = 0.0
         net = neat.nn.FeedForwardNetwork.create(genome, config)
         
         # Run multiple episodes to get average fitness
-        num_episodes = 3
+        num_episodes = 1
         fitness_values = list()
         
         for episode in range(num_episodes):
@@ -71,7 +71,7 @@ def eval_genomes(genomes, config):
         
         # Average fitness over episodes
         genome.fitness = np.mean(fitness_values)
-        print(f"Genome {genome_id} fitness: {genome.fitness:.2f} ({fitness_values})")
+        print(f"Genome {genome_id} fitness: {genome.fitness:.2f} ({np.round(fitness_values, 2)})")
     
     env.close()
 
