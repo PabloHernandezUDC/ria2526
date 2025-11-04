@@ -33,6 +33,7 @@ def eval_genomes(genomes, config):
         for episode in range(num_episodes):
             obs, info = env.reset()
             
+            time.sleep(0.1)
             env.unwrapped.sim.setRobotLocation(0, position={'x': -1000.0, 'y': 39.0, 'z': -400.0})
             time.sleep(0.1)
             
@@ -112,7 +113,7 @@ def main(config_file):
     print("\n*** Starting NEAT evolution ***")
     start_time = time.time()
     
-    winner = p.run(eval_genomes, 20)
+    winner = p.run(eval_genomes, 25)
     
     training_time = time.time() - start_time
     print(f"\n*** Training completed in {training_time:.2f} seconds ***")

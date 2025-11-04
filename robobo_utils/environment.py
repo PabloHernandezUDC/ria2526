@@ -51,7 +51,7 @@ class RoboboEnv(gym.Env):
         self.action_space = gym.spaces.Discrete(3)
 
         # Map actions to wheel speeds
-        speed = 10
+        speed = 8
         self._action_to_direction = {
             0: np.array([speed*3, speed*3]),   # Forward
             1: np.array([0, speed]),         # Turn Left
