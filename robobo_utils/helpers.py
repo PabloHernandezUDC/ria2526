@@ -116,16 +116,17 @@ def get_angle_to_target(robot_pos: dict, target_pos: dict):
     return angle_diff
 
 
-def get_reward(distance: float, angle: float, alpha: float = 0.5):
+def get_reward(distance: float, angle: float, observation: dict, alpha: float = 0.5):
     """
     Calculate multi-component reward.
     
     Combines distance-based reward (closer is better) with angle-based reward
-    (facing target is better).
+    (facing target is better) and IR-based penalty (avoid walls).
     
     Args:
         distance: Distance to target
         angle: Angle to target in degrees
+        observation: Observation dict containing IR sensor readings
         alpha: Weight of distance component (0-1), default 0.5
         
     Returns:
@@ -134,5 +135,36 @@ def get_reward(distance: float, angle: float, alpha: float = 0.5):
     r1 = 1000 / distance
     r1 = min(5, r1)
     r2 = -(abs(angle) / 90)
+    
+    # Penalty for being close to walls based on IR sensors
+    ir_penalty = 0.0
+    ir_front = observation["ir_front"][0]
+    
+    # Penalize based on how close obstacles are detected
+    if ir_front == 3:  # very close
+        ir_penalty += 2.0
+    elif ir_front == 2:  # close
+        ir_penalty += 1.0
+    elif ir_front == 1:  # medium
+        ir_penalty += 0.3
+        
+    # Add penalties for side sensors if they exist
+    if "ir_left" in observation:
+        ir_left = observation["ir_left"][0]
+        if ir_left == 3:
+            ir_penalty += 2.0
+        elif ir_left == 2:
+            ir_penalty += 1.0
+        elif ir_left == 1:
+            ir_penalty += 0.3
+            
+    if "ir_right" in observation:
+        ir_right = observation["ir_right"][0]
+        if ir_right == 3:
+            ir_penalty += 2.0
+        elif ir_right == 2:
+            ir_penalty += 1.0
+        elif ir_right == 1:
+            ir_penalty += 0.3
 
-    return (alpha) * r1 + (1 - alpha) * r2
+    return (alpha) * r1 + (1 - alpha) * r2 - ir_penalty

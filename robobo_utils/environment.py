@@ -28,6 +28,8 @@ class RoboboEnv(gym.Env):
         Dict with keys:
             - "sector": Discrete(6) representing visual sectors (0-5)
             - "ir_front": Discrete(4) representing front IR distance (0=far, 3=very close)
+            - "ir_left": Discrete(4) representing left IR distance (optional, if use_side_irs=True)
+            - "ir_right": Discrete(4) representing right IR distance (optional, if use_side_irs=True)
         
     Action Space:
         Discrete(3): 0=forward, 1=turn left, 2=turn right
@@ -36,16 +38,22 @@ class RoboboEnv(gym.Env):
         verbose: If True, prints step information (default: True)
         target_name: Name of the target object in simulator (default: "CYLINDERMIDBALL")
         alpha: Weight for angle vs distance in reward calculation (default: 0.4)
+        use_side_irs: If True, includes left and right IR sensors in observation (default: False)
     """
 
-    def __init__(self, verbose=True, target_name="CYLINDERMIDBALL", alpha=0.4):
+    def __init__(self, verbose=True, target_name="CYLINDERMIDBALL", alpha=0.4, use_side_irs=False):
         # Observation space: visual sector (0-5) + IR sensor sectors (0-3)
-        self.observation_space = gym.spaces.Dict(
-            {
-                "sector": gym.spaces.Discrete(6),
-                "ir_front": gym.spaces.Discrete(4)
-            }
-        )
+        obs_spaces = {
+            "sector": gym.spaces.Discrete(6),
+            "ir_front": gym.spaces.Discrete(4)
+        }
+        
+        if use_side_irs:
+            obs_spaces["ir_left"] = gym.spaces.Discrete(4)
+            obs_spaces["ir_right"] = gym.spaces.Discrete(4)
+        
+        self.observation_space = gym.spaces.Dict(obs_spaces)
+        self.use_side_irs = use_side_irs
 
         # Action space: 3 discrete actions
         self.action_space = gym.spaces.Discrete(3)
@@ -113,7 +121,7 @@ class RoboboEnv(gym.Env):
         )
 
         # Calculate reward
-        reward = get_reward(distance, angle, alpha=self.alpha)
+        reward = get_reward(distance, angle, observation, alpha=self.alpha)
 
         if self.verbose:
             print(f"Action: {parse_action(action)} | Reward: {(reward):.3f} | Distance: {(distance):.3f} | Obs: {observation}")
@@ -218,13 +226,47 @@ class RoboboEnv(gym.Env):
                 ir_sector = 2
             else:
                 ir_sector = 3
+            
+            # Get left and right IR sensors if enabled
+            if self.use_side_irs:
+                left_ir = ir_sensors.get(IR.FrontL.value, 0)
+                right_ir = ir_sensors.get(IR.FrontR.value, 0)
+                
+                # Discretize left IR
+                if left_ir < 10:
+                    ir_left_sector = 0
+                elif left_ir < 25:
+                    ir_left_sector = 1
+                elif left_ir < 50:
+                    ir_left_sector = 2
+                else:
+                    ir_left_sector = 3
+                
+                # Discretize right IR
+                if right_ir < 10:
+                    ir_right_sector = 0
+                elif right_ir < 25:
+                    ir_right_sector = 1
+                elif right_ir < 50:
+                    ir_right_sector = 2
+                else:
+                    ir_right_sector = 3
         else:
             ir_sector = 0
+            if self.use_side_irs:
+                ir_left_sector = 0
+                ir_right_sector = 0
 
-        return {
+        obs = {
             "sector": np.array([sector], dtype=int).flatten(),
             "ir_front": np.array([ir_sector], dtype=int).flatten()
         }
+        
+        if self.use_side_irs:
+            obs["ir_left"] = np.array([ir_left_sector], dtype=int).flatten()
+            obs["ir_right"] = np.array([ir_right_sector], dtype=int).flatten()
+        
+        return obs
 
     def _get_info(self):
         """Get additional information about current step"""
