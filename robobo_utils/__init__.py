@@ -13,7 +13,8 @@ from .helpers import (
     get_cylinder_pos,
     get_distance_to_target,
     get_angle_to_target,
-    get_reward
+    get_reward,
+    get_hybrid_reward
 )
 from .visualization import plot_evaluation_results
 
@@ -26,5 +27,6 @@ __all__ = [
     'get_distance_to_target',
     'get_angle_to_target',
     'get_reward',
+    'get_hybrid_reward',
     'plot_evaluation_results'
 ]

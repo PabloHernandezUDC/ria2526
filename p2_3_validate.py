@@ -11,10 +11,11 @@ WINNER_FILE = "checkpoints/2_3/winner_genome.pkl"
 def run_best_genome(genome, config, num_episodes=5, verbose=True):
     """
     Run the best genome to visualize performance (2.3).
+    Uses hybrid reward function for navigation around obstacle.
     """
-    print("\n*** Running best genome (2.3) ***")
+    print("\n*** Running best genome (2.3) with hybrid reward ***")
     id = "RoboboEnv"
-    env = gym.make(id, verbose=verbose, target_name="CYLINDERBALL", alpha=0.35)
+    env = gym.make(id, verbose=verbose, target_name="CYLINDERBALL", alpha=0.5)
     net = neat.nn.FeedForwardNetwork.create(genome, config)
     episode_rewards = []
     episode_steps = []

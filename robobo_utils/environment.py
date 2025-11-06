@@ -12,6 +12,7 @@ from .helpers import (
     get_distance_to_target,
     get_angle_to_target,
     get_reward,
+    get_hybrid_reward,
     parse_action
 )
 
@@ -71,6 +72,7 @@ class RoboboEnv(gym.Env):
         self.steps_without_target = 0
         self.verbose = verbose
         self.alpha = alpha
+        self.prev_distance = None  # Track previous distance for progress reward
 
     def step(self, action):
         """
@@ -112,8 +114,18 @@ class RoboboEnv(gym.Env):
             self.target_pos
         )
 
-        # Calculate reward
-        reward = get_reward(distance, angle, alpha=self.alpha)
+        # Calculate hybrid reward using sensor information
+        reward = get_hybrid_reward(
+            distance=distance,
+            angle=angle,
+            sector=int(observation["sector"][0]),
+            ir_front=int(observation["ir_front"][0]),
+            prev_distance=self.prev_distance,
+            alpha=self.alpha
+        )
+        
+        # Update previous distance
+        self.prev_distance = distance
 
         if self.verbose:
             print(f"Action: {parse_action(action)} | Reward: {(reward):.3f} | Distance: {(distance):.3f} | Obs: {observation}")
@@ -167,6 +179,9 @@ class RoboboEnv(gym.Env):
 
         observation = self._get_obs()
         info = self._get_info()
+        
+        # Reset previous distance
+        self.prev_distance = None
 
         # self.target_pos = get_cylinder_pos(self.sim, self.target_name)
 

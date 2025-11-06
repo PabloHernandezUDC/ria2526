@@ -13,15 +13,17 @@ CONFIG_FILE = "checkpoints/2_3/config"
 def eval_genomes(genomes, config):
     """
     Evaluate all genomes in the population for scenario 2.3.
+    Uses hybrid reward function to navigate around obstacle.
     """
     id = "RoboboEnv"
     # No posición inicial personalizada, se usa la predeterminada
-    env = gym.make(id, verbose=False, target_name="CYLINDERBALL", alpha=0.35)
+    # Alpha más alto para priorizar distancia en recompensa
+    env = gym.make(id, verbose=False, target_name="CYLINDERBALL", alpha=0.5)
 
     for genome_id, genome in genomes:
         genome.fitness = 0.0
         net = neat.nn.FeedForwardNetwork.create(genome, config)
-        num_episodes = 1
+        num_episodes = 3  # Aumentar a 3 episodios para mejor evaluación
         fitness_values = list()
 
         for episode in range(num_episodes):
@@ -29,7 +31,7 @@ def eval_genomes(genomes, config):
             episode_reward = 0.0
             done = False
             steps = 0
-            max_steps = 50
+            max_steps = 100  # Aumentar límite de pasos para dar más tiempo
 
             while not done and steps < max_steps:
                 sector = obs["sector"][0]
@@ -74,9 +76,10 @@ def main(config_file):
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
     p.add_reporter(neat.Checkpointer(5, filename_prefix='checkpoints/2_3/checkpoint-'))
-    print("\n*** Starting NEAT evolution (2.3) ***")
+    print("\n*** Starting NEAT evolution (2.3) with hybrid reward ***")
+    print("Strategy: Obstacle avoidance + distance-based navigation")
     start_time = time.time()
-    winner = p.run(eval_genomes, 25)
+    winner = p.run(eval_genomes, 50)  # Aumentar a 50 generaciones
     training_time = time.time() - start_time
     print(f"\n*** Training completed in {training_time:.2f} seconds ***")
     print('\n*** Best genome ***')

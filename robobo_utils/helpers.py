@@ -136,3 +136,65 @@ def get_reward(distance: float, angle: float, alpha: float = 0.5):
     r2 = -(abs(angle) / 90)
 
     return (alpha) * r1 + (1 - alpha) * r2
+
+
+def get_hybrid_reward(distance: float, angle: float, sector: int, ir_front: int, 
+                       prev_distance: float = None, alpha: float = 0.5):
+    """
+    Calculate hybrid reward that combines obstacle avoidance with distance-based navigation.
+    
+    Strategy:
+    - When obstacle is detected (ir_front >= 2): Penalize and encourage turning
+    - When target not visible (sector == 5) but no obstacle: Use distance-based reward
+    - When target visible and no obstacle: Strong distance + angle reward
+    
+    Args:
+        distance: Current distance to target
+        angle: Angle to target in degrees
+        sector: Visual sector where target appears (5 = not visible)
+        ir_front: Front IR sensor reading (0=far, 3=very close)
+        prev_distance: Previous distance to target (for progress tracking)
+        alpha: Weight for distance vs angle (default 0.5)
+        
+    Returns:
+        Combined reward value
+    """
+    # Base distance reward component
+    distance_reward = 1000 / max(distance, 1)
+    distance_reward = min(5, distance_reward)
+    
+    # Angle reward component (penalize if not facing target)
+    angle_reward = -(abs(angle) / 90)
+    
+    # Progress reward (if moving closer)
+    progress_reward = 0
+    if prev_distance is not None:
+        distance_diff = prev_distance - distance
+        progress_reward = distance_diff * 0.01  # Small bonus for getting closer
+    
+    # CASE 1: Obstacle detected (ir_front >= 2)
+    if ir_front >= 2:
+        # Strong penalty for being near obstacle
+        obstacle_penalty = -2.0
+        # Encourage turning when near obstacle
+        turn_bonus = 0.5 if sector != 2 and sector != 3 else 0  # Bonus for not going straight
+        return obstacle_penalty + turn_bonus + progress_reward
+    
+    # CASE 2: Target not visible (sector == 5) but no obstacle
+    elif sector == 5:
+        # Use distance-based navigation (like P1)
+        # Reward getting closer even if target not visible
+        return alpha * distance_reward + (1 - alpha) * angle_reward + progress_reward
+    
+    # CASE 3: Target visible and no obstacle - optimal situation
+    else:
+        # Strong reward for both distance and alignment
+        visibility_bonus = 1.0  # Bonus for seeing target
+        # Extra bonus if target is centered (sectors 2 or 3)
+        centering_bonus = 0.5 if sector == 2 or sector == 3 else 0
+        
+        return (alpha * distance_reward + 
+                (1 - alpha) * angle_reward + 
+                visibility_bonus + 
+                centering_bonus + 
+                progress_reward)
