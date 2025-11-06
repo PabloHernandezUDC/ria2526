@@ -116,23 +116,39 @@ def get_angle_to_target(robot_pos: dict, target_pos: dict):
     return angle_diff
 
 
-def get_reward(distance: float, angle: float, alpha: float = 0.5):
+def get_reward(distance: float, angle: float, alpha: float = 0.5, robot_pos: dict = None, penalty_zone: tuple = (0, 0), penalty_strength: float = 0.0):
     """
     Calculate multi-component reward.
     
     Combines distance-based reward (closer is better) with angle-based reward
-    (facing target is better).
+    (facing target is better), and includes a penalty for getting close to 
+    dangerous zones.
     
     Args:
         distance: Distance to target
         angle: Angle to target in degrees
         alpha: Weight of distance component (0-1), default 0.5
+        robot_pos: Robot position dictionary with 'x' and 'z' keys (optional)
+        penalty_zone: Tuple (x, z) coordinates to avoid, default (0, 0)
+        penalty_strength: Strength of the penalty, default 0.0 (disabled)
         
     Returns:
-        Combined reward value
+        Combined reward value with penalty for approaching forbidden zones
     """
     r1 = 1000 / distance
     r1 = min(5, r1)
     r2 = -(abs(angle) / 90)
 
-    return (alpha) * r1 + (1 - alpha) * r2
+    reward = (alpha) * r1 + (1 - alpha) * r2
+    
+    # Add penalty for getting close to penalty zone (only if enabled)
+    if robot_pos is not None and penalty_strength > 0:
+        rx, rz = robot_pos["x"], robot_pos["z"]
+        px, pz = penalty_zone
+        distance_to_penalty_zone = dist((rx, rz), (px, pz))
+        
+        # Penalty increases as robot gets closer to the zone
+        penalty = penalty_strength / distance_to_penalty_zone
+        reward -= penalty
+    
+    return reward

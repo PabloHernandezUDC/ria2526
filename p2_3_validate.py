@@ -14,7 +14,7 @@ def run_best_genome(genome, config, num_episodes=5, verbose=True):
     """
     print("\n*** Running best genome (2.3) ***")
     id = "RoboboEnv"
-    env = gym.make(id, verbose=verbose, target_name="CYLINDERBALL", alpha=0.35)
+    env = gym.make(id, verbose=verbose, target_name="CYLINDERBALL", alpha=0.35, penalty_strength=1000.0)
     net = neat.nn.FeedForwardNetwork.create(genome, config)
     episode_rewards = []
     episode_steps = []
@@ -28,12 +28,35 @@ def run_best_genome(genome, config, num_episodes=5, verbose=True):
         print(f"\n--- Episode {episode + 1} ---")
         while not done and steps < max_steps:
             sector = obs["sector"][0]
-            ir_front = obs["ir_front"][0]
-            nn_input = [0.0] * 10  # 6 for sector + 4 for IR
+            ir_front_c = obs["ir_front_c"][0]
+            ir_front_r = obs["ir_front_r"][0]
+            ir_front_l = obs["ir_front_l"][0]
+            ir_right = obs["ir_right"][0]
+            ir_left = obs["ir_left"][0]
+            ir_back_c = obs["ir_back_c"][0]
+            ir_back_r = obs["ir_back_r"][0]
+            ir_back_l = obs["ir_back_l"][0]
+            
+            # 6 for sector + 4 for ir_front_c + 7 other IR sensors (binary)
+            nn_input = [0.0] * 17
+            
+            # Sector encoding (one-hot)
             if sector < 6:
                 nn_input[sector] = 1.0
-            if ir_front < 4:
-                nn_input[6 + ir_front] = 1.0
+            
+            # Front-center IR (one-hot encoding for 4 states)
+            if ir_front_c < 4:
+                nn_input[6 + ir_front_c] = 1.0
+            
+            # Other IR sensors encoding (binary)
+            nn_input[10] = float(ir_front_r)
+            nn_input[11] = float(ir_front_l)
+            nn_input[12] = float(ir_right)
+            nn_input[13] = float(ir_left)
+            nn_input[14] = float(ir_back_c)
+            nn_input[15] = float(ir_back_r)
+            nn_input[16] = float(ir_back_l)
+            
             output = net.activate(nn_input)
             action = np.argmax([output[0] < 0.33, 
                                0.33 <= output[0] < 0.67, 
