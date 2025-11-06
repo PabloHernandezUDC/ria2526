@@ -28,11 +28,8 @@ class RoboboEnv(gym.Env):
         Dict with keys:
             - "sector": Discrete(6) representing visual sectors (0-5)
             - "ir_front_c": Discrete(4) representing front-center IR (0=far, 1=medium-far, 2=medium-close, 3=very close)
-            - "ir_front_r": Discrete(2) representing front-right IR (0=far >25, 1=close <25)
-            - "ir_front_l": Discrete(2) representing front-left IR (0=far >25, 1=close <25)
             - "ir_right": Discrete(2) representing right IR (0=far >25, 1=close <25)
             - "ir_left": Discrete(2) representing left IR (0=far >25, 1=close <25)
-            - "ir_back_c": Discrete(2) representing back-center IR (0=far >25, 1=close <25)
             - "ir_back_r": Discrete(2) representing back-right IR (0=far >25, 1=close <25)
             - "ir_back_l": Discrete(2) representing back-left IR (0=far >25, 1=close <25)
         
@@ -52,11 +49,8 @@ class RoboboEnv(gym.Env):
             {
                 "sector": gym.spaces.Discrete(6),
                 "ir_front_c": gym.spaces.Discrete(4),
-                "ir_front_r": gym.spaces.Discrete(2),
-                "ir_front_l": gym.spaces.Discrete(2),
                 "ir_right": gym.spaces.Discrete(2),
                 "ir_left": gym.spaces.Discrete(2),
-                "ir_back_c": gym.spaces.Discrete(2),
                 "ir_back_r": gym.spaces.Discrete(2),
                 "ir_back_l": gym.spaces.Discrete(2)
             }
@@ -204,7 +198,7 @@ class RoboboEnv(gym.Env):
         
         Returns:
             Dictionary with "sector" and IR sensor keys indicating where target 
-            is visible and obstacle proximity on all 8 IR sensors (binary: close/far)
+            is visible and obstacle proximity on 5 IR sensors
         """
         red_x = np.array([self.robobo.readColorBlob(self.target_color).posx])
         if red_x == 0:
@@ -218,52 +212,40 @@ class RoboboEnv(gym.Env):
         
         if ir_sensors:
             front_c_ir = ir_sensors.get(IR.FrontC.value, 0)
-            front_r_ir = ir_sensors.get(IR.FrontR.value, 0)
-            front_l_ir = ir_sensors.get(IR.FrontL.value, 0)
             right_ir = ir_sensors.get(IR.FrontRR.value, 0)
             left_ir = ir_sensors.get(IR.FrontLL.value, 0)
-            back_c_ir = ir_sensors.get(IR.BackC.value, 0)
             back_r_ir = ir_sensors.get(IR.BackR.value, 0)
             back_l_ir = ir_sensors.get(IR.BackL.value, 0)
             
             # Front-center: 4-state discretization (0=far, 1=medium-far, 2=medium-close, 3=very close)
-            if front_c_ir < 10:
+            if front_c_ir < 5:
                 ir_front_c_sector = 0
-            elif front_c_ir < 25:
+            elif front_c_ir < 20:
                 ir_front_c_sector = 1
             elif front_c_ir < 50:
                 ir_front_c_sector = 2
             else:
                 ir_front_c_sector = 3
             
-            # Other sensors: Binary discretization (0=far >=25, 1=close <25)
-            ir_front_r_sector = 1 if front_r_ir < 25 else 0
-            ir_front_l_sector = 1 if front_l_ir < 25 else 0
+            # Other sensors: Binary discretization (0=close >=25, 1=far <25)
             ir_right_sector = 1 if right_ir < 25 else 0
             ir_left_sector = 1 if left_ir < 25 else 0
-            ir_back_c_sector = 1 if back_c_ir < 25 else 0
-            ir_back_r_sector = 1 if back_r_ir < 25 else 0
-            ir_back_l_sector = 1 if back_l_ir < 25 else 0
+            ir_back_r_sector = 1 if back_r_ir < 2 else 0
+            ir_back_l_sector = 1 if back_l_ir < 2 else 0
             
-            # print(f"back_l {back_l_ir} | back_c {back_c_ir} | back_r {back_r_ir}")
+            # print(f"front c {front_c_ir} | front rr {right_ir} | front ll {left_ir} | back r {back_r_ir} | back l {back_l_ir}")
         else:
             ir_front_c_sector = 0
-            ir_front_r_sector = 0
-            ir_front_l_sector = 0
             ir_right_sector = 0
             ir_left_sector = 0
-            ir_back_c_sector = 0
             ir_back_r_sector = 0
             ir_back_l_sector = 0
 
         return {
             "sector": np.array([sector], dtype=int).flatten(),
             "ir_front_c": np.array([ir_front_c_sector], dtype=int).flatten(),
-            "ir_front_r": np.array([ir_front_r_sector], dtype=int).flatten(),
-            "ir_front_l": np.array([ir_front_l_sector], dtype=int).flatten(),
             "ir_right": np.array([ir_right_sector], dtype=int).flatten(),
             "ir_left": np.array([ir_left_sector], dtype=int).flatten(),
-            "ir_back_c": np.array([ir_back_c_sector], dtype=int).flatten(),
             "ir_back_r": np.array([ir_back_r_sector], dtype=int).flatten(),
             "ir_back_l": np.array([ir_back_l_sector], dtype=int).flatten()
         }

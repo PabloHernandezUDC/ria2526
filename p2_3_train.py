@@ -40,16 +40,13 @@ def eval_genomes(genomes, config):
             while not done and steps < max_steps:
                 sector = obs["sector"][0]
                 ir_front_c = obs["ir_front_c"][0]
-                ir_front_r = obs["ir_front_r"][0]
-                ir_front_l = obs["ir_front_l"][0]
                 ir_right = obs["ir_right"][0]
                 ir_left = obs["ir_left"][0]
-                ir_back_c = obs["ir_back_c"][0]
                 ir_back_r = obs["ir_back_r"][0]
                 ir_back_l = obs["ir_back_l"][0]
                 
-                # 6 for sector + 4 for ir_front_c + 7 other IR sensors (binary)
-                nn_input = [0.0] * 17
+                # 6 for sector + 4 for ir_front_c + 4 other IR sensors (binary)
+                nn_input = [0.0] * 14
                 
                 # Sector encoding (one-hot)
                 if sector < 6:
@@ -60,13 +57,10 @@ def eval_genomes(genomes, config):
                     nn_input[6 + ir_front_c] = 1.0
                 
                 # Other IR sensors encoding (binary)
-                nn_input[10] = float(ir_front_r)
-                nn_input[11] = float(ir_front_l)
-                nn_input[12] = float(ir_right)
-                nn_input[13] = float(ir_left)
-                nn_input[14] = float(ir_back_c)
-                nn_input[15] = float(ir_back_r)
-                nn_input[16] = float(ir_back_l)
+                nn_input[10] = float(ir_right)
+                nn_input[11] = float(ir_left)
+                nn_input[12] = float(ir_back_r)
+                nn_input[13] = float(ir_back_l)
                 
                 output = net.activate(nn_input)
                 action = np.argmax([output[0] < 0.33, 
@@ -105,7 +99,7 @@ def main(config_file):
     p.add_reporter(neat.Checkpointer(5, filename_prefix='checkpoints/2_3/checkpoint-'))
     print("\n*** Starting NEAT evolution (2.3) ***")
     start_time = time.time()
-    winner = p.run(eval_genomes, 25)
+    winner = p.run(eval_genomes, 20)
     training_time = time.time() - start_time
     print(f"\n*** Training completed in {training_time:.2f} seconds ***")
     print('\n*** Best genome ***')
