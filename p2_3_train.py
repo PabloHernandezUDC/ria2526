@@ -15,19 +15,20 @@ def eval_genomes(genomes, config):
     Evaluate all genomes in the population for scenario 2.3.
     """
     id = "RoboboEnv"
-    # No posición inicial personalizada, se usa la predeterminada
+
     env = gym.make(
         id,
         verbose=False,
         target_name="CYLINDERBALL",
         alpha=0.35,
-        penalty_strength=500
+        penalty_strength=500,
+        target_pos={'x': 1102.0, 'z': 0.0}
     )
 
     for genome_id, genome in genomes:
         genome.fitness = 0.0
         net = neat.nn.FeedForwardNetwork.create(genome, config)
-        num_episodes = 1
+        num_episodes = 2
         fitness_values = list()
 
         for episode in range(num_episodes):
@@ -99,7 +100,7 @@ def main(config_file):
     p.add_reporter(neat.Checkpointer(5, filename_prefix='checkpoints/2_3/checkpoint-'))
     print("\n*** Starting NEAT evolution (2.3) ***")
     start_time = time.time()
-    winner = p.run(eval_genomes, 20)
+    winner = p.run(eval_genomes, 100)
     training_time = time.time() - start_time
     print(f"\n*** Training completed in {training_time:.2f} seconds ***")
     print('\n*** Best genome ***')

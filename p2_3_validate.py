@@ -14,7 +14,7 @@ def run_best_genome(genome, config, num_episodes=5, verbose=True):
     """
     print("\n*** Running best genome (2.3) ***")
     id = "RoboboEnv"
-    env = gym.make(id, verbose=verbose, target_name="CYLINDERBALL", alpha=0.35, penalty_strength=1000.0)
+    env = gym.make(id, verbose=verbose, target_name="CYLINDERBALL", alpha=0.35, penalty_strength=1000.0, target_pos={'x': 1102.0, 'z': 0.0})
     net = neat.nn.FeedForwardNetwork.create(genome, config)
     episode_rewards = []
     episode_steps = []

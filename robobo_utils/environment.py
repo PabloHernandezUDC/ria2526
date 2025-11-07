@@ -41,9 +41,10 @@ class RoboboEnv(gym.Env):
         target_name: Name of the target object in simulator (default: "CYLINDERMIDBALL")
         alpha: Weight for angle vs distance in reward calculation (default: 0.4)
         penalty_strength: Strength of penalty for approaching (0, 0) (default: 0.0, disabled)
+        target_pos: Optional fixed target position dict with 'x' and 'z' keys (default: None, uses cylinder position)
     """
 
-    def __init__(self, verbose=True, target_name="CYLINDERMIDBALL", alpha=0.4, penalty_strength=0.0):
+    def __init__(self, verbose=True, target_name="CYLINDERMIDBALL", alpha=0.4, penalty_strength=0.0, target_pos=None):
         # Observation space: visual sector (0-5) + IR sensor sectors
         self.observation_space = gym.spaces.Dict(
             {
@@ -75,7 +76,10 @@ class RoboboEnv(gym.Env):
         self.sim.connect()
 
         self.target_name = target_name
-        self.target_pos = get_cylinder_pos(self.sim, self.target_name)
+        if target_pos is not None:
+            self.target_pos = target_pos
+        else:
+            self.target_pos = get_cylinder_pos(self.sim, self.target_name)
         self.target_color = BlobColor.RED
         self.steps_without_target = 0
         self.verbose = verbose
