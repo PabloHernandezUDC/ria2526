@@ -78,21 +78,21 @@ def classify_pose(keypoints, confidence_threshold=0.5):
     
     # Check if right arm is raised
     if kp.get('right_shoulder') is not None and kp.get('right_wrist') is not None:
-        if kp['right_wrist'][1] < kp['right_shoulder'][1] - 50:
+        if kp['right_wrist'][1] < kp['right_shoulder'][1] - 20:
             right_arm_raised = True
     
     # Check if left arm is raised
     if kp.get('left_shoulder') is not None and kp.get('left_wrist') is not None:
-        if kp['left_wrist'][1] < kp['left_shoulder'][1] - 50:
+        if kp['left_wrist'][1] < kp['left_shoulder'][1] - 20:
             left_arm_raised = True
     
     # Determine action based on arm positions
     if left_arm_raised and right_arm_raised:
         return "Forward"
     elif right_arm_raised:
-        return "Right"
-    elif left_arm_raised:
         return "Left"
+    elif left_arm_raised:
+        return "Right"
     else:
         return "Stop"
 
