@@ -1,38 +1,47 @@
-"""
-YOLO Pose Detection + Robobo Teleoperation
-Uses Ultralytics YOLOv8 for real-time pose estimation to control Robobo
-"""
+import time
+from datetime import datetime
 
-from ultralytics import YOLO
 import cv2
 import numpy as np
-from datetime import datetime
 from robobopy.Robobo import Robobo
-from robobosim.RoboboSim import RoboboSim
 from robobopy.utils.BlobColor import BlobColor
+from robobopy_videostream.RoboboVideo import RoboboVideo
+from robobosim.RoboboSim import RoboboSim
 from stable_baselines3 import PPO
-import time
+from ultralytics import YOLO
 
+# --------------------
+
+# "blob" or "yolo"
+MODE = "blob"
+
+# target class for YOLO
+TARGET = "bottle"  # Target object class for YOLO detection
+
+# robot ip (localhost for sim)
+IP = "localhost"
+
+# --------------------
 
 # YOLOv8-pose keypoint indices
 KEYPOINT_DICT = {
-    'nose': 0,
-    'left_eye': 1,
-    'right_eye': 2,
-    'left_ear': 3,
-    'right_ear': 4,
-    'left_shoulder': 5,
-    'right_shoulder': 6,
-    'left_elbow': 7,
-    'right_elbow': 8,
-    'left_wrist': 9,
-    'right_wrist': 10,
-    'left_hip': 11,
-    'right_hip': 12,
-    'left_knee': 13,
-    'right_knee': 14,
-    'left_ankle': 15,
-    'right_ankle': 16
+    "nose": 0,
+    "left_eye": 1,
+    "right_eye": 2,
+    "left_ear": 3,
+    "right_ear": 4,
+    "left_shoulder": 5,
+    "right_shoulder": 6,
+    "left_elbow": 7,
+    "right_elbow": 8,
+    "left_wrist": 9,
+    "right_wrist": 10,
+    "left_hip": 11,
+    "right_hip": 12,
+    "left_knee": 13,
+    "right_knee": 14,
+    "left_ankle": 15,
+    "right_ankle": 16
 }
 
 
@@ -77,13 +86,13 @@ def classify_pose(keypoints, confidence_threshold=0.5):
     right_arm_raised = False
     
     # Check if right arm is raised
-    if kp.get('right_shoulder') is not None and kp.get('right_wrist') is not None:
-        if kp['right_wrist'][1] < kp['right_shoulder'][1] - 20:
+    if kp.get("right_shoulder") is not None and kp.get("right_wrist") is not None:
+        if kp["right_wrist"][1] < kp["right_shoulder"][1] - 20:
             right_arm_raised = True
     
     # Check if left arm is raised
-    if kp.get('left_shoulder') is not None and kp.get('left_wrist') is not None:
-        if kp['left_wrist'][1] < kp['left_shoulder'][1] - 20:
+    if kp.get("left_shoulder") is not None and kp.get("left_wrist") is not None:
+        if kp["left_wrist"][1] < kp["left_shoulder"][1] - 20:
             left_arm_raised = True
     
     # Determine action based on arm positions
@@ -132,6 +141,51 @@ def detect_red_blob(rob):
     if blob and blob.size > 100:  # Umbral mínimo de tamaño
         return True, blob
     return False, None
+
+
+def detect_yolo_object(video_stream, yolo_model, target_class="bottle", confidence_threshold=0.5):
+    """
+    Detect target object using YOLO model with robot's camera.
+    Returns True if object is detected with sufficient confidence, False otherwise.
+    """
+    # Get frame from robot's camera
+    frame, timestamp, sync_id, frame_id = video_stream.getImageWithMetadata()
+    
+    if frame is None:
+        return False, None, None
+    
+    # Run YOLO detection
+    results = yolo_model(frame, verbose=False)
+    
+    # Check for target object
+    for result in results:
+        boxes = result.boxes
+        for box in boxes:
+            # Get class name and confidence
+            cls = int(box.cls[0])
+            conf = float(box.conf[0])
+            class_name = result.names[cls]
+            
+            # Check if it's the target object with sufficient confidence
+            if class_name == target_class and conf >= confidence_threshold:
+                # Get box coordinates
+                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                box_center_x = (x1 + x2) / 2
+                box_width = x2 - x1
+                box_height = y2 - y1
+                box_area = box_width * box_height
+                
+                detection_info = {
+                    "confidence": conf,
+                    "center_x": box_center_x,
+                    "area": box_area,
+                    "width": box_width,
+                    "height": box_height
+                }
+                
+                return True, detection_info, frame
+    
+    return False, None, frame
 
 
 def run_rl_policy(rob, model, target_color=BlobColor.RED):
@@ -201,7 +255,15 @@ def run_rl_policy(rob, model, target_color=BlobColor.RED):
 
 def main():
     # Load the YOLOv8 pose model
-    model = YOLO('yolo_models/yolov8n-pose.pt')
+    pose_model = YOLO("yolo_models/yolov8n-pose.pt")
+    
+    # Load YOLO object detection model if using YOLO mode
+    if MODE == "yolo":
+        object_model = None
+        video_stream = None
+        print("Cargando modelo YOLO para detección de objetos...")
+        object_model = YOLO("yolov8n.pt")  # Standard YOLOv8 model for object detection
+        print("Modelo YOLO cargado correctamente")
     
     # Cargar modelo de RL de la práctica 01
     print("Cargando modelo de RL de práctica 01...")
@@ -210,11 +272,19 @@ def main():
     
     # Conectar con RoboboSim
     print("Conectando con RoboboSim...")
-    sim = RoboboSim(ip="127.0.0.1")
-    rob = Robobo(ip="127.0.0.1")
+    sim = RoboboSim(IP)
+    rob = Robobo(IP)
     sim.connect()
     rob.connect()
     print("Conectado correctamente al simulador")
+    
+    # Initialize video stream if using YOLO mode
+    if MODE == "yolo":
+        print("Inicializando stream de video del robot...")
+        video_stream = RoboboVideo(IP)
+        video_stream.connect()
+        rob.startStream()
+        print("Stream de video inicializado correctamente")
     
     # Usar la webcam del ordenador (0 = cámara predeterminada)
     print("Abriendo cámara del ordenador...")
@@ -232,7 +302,12 @@ def main():
     print("- Brazo derecho arriba: Girar derecha")
     print("- Brazo izquierdo arriba: Girar izquierda")
     print("- Sin brazos: Detener")
-    print("\nCuando se detecte el BLOB ROJO y hayas hecho al menos 5 acciones,")
+    if MODE == "blob":
+        print(f"\nModo: BLOB DETECTION (Blob rojo)")
+        print("Cuando se detecte el BLOB ROJO y hayas hecho al menos 5 acciones,")
+    else:
+        print(f"\nModo: YOLO OBJECT DETECTION (Objeto: {TARGET})")
+        print(f"Cuando se detecte '{TARGET}' y hayas hecho al menos 5 acciones,")
     print("se activará automáticamente la política de refuerzo.")
     print("Presiona 'q' para salir\n")
     
@@ -253,7 +328,7 @@ def main():
                     break
                 
                 # Run YOLOv8 pose detection on the frame
-                results = model(frame, verbose=False)
+                results = pose_model(frame, verbose=False)
                 
                 # Get current timestamp
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
@@ -261,11 +336,34 @@ def main():
                 # Visualize the results on the frame
                 annotated_frame = results[0].plot()
                 
-                # Verificar si se detecta el blob rojo
-                blob_detected, blob = detect_red_blob(rob)
+                # Verificar detección según el modo seleccionado
+                target_detected = False
+                detection_info = None
                 
-                if blob_detected and action_count >= min_actions:
-                    print(f"\n🔴 ¡BLOB ROJO DETECTADO! (size: {blob.size:.0f})")
+                if MODE == "blob":
+                    # Modo blob: detectar blob rojo
+                    blob_detected, blob = detect_red_blob(rob)
+                    if blob_detected:
+                        target_detected = True
+                        detection_info = f"size: {blob.size:.0f}"
+                        cv2.putText(annotated_frame, f"RED BLOB DETECTED! Size: {blob.size:.0f}", 
+                                   (10, frame.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 
+                                   0.7, (0, 0, 255), 2)
+                else:
+                    # Modo YOLO: detectar objeto objetivo
+                    yolo_detected, yolo_info, robot_frame = detect_yolo_object(video_stream, object_model, TARGET)
+                    if yolo_detected:
+                        target_detected = True
+                        detection_info = f"conf: {yolo_info["confidence"]:.2f}, area: {yolo_info["area"]:.0f}"
+                        cv2.putText(annotated_frame, f"{TARGET.upper()} DETECTED! Conf: {yolo_info["confidence"]:.2f}", 
+                                   (10, frame.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 
+                                   0.7, (0, 0, 255), 2)
+                
+                if target_detected and action_count >= min_actions:
+                    if MODE == "blob":
+                        print(f"\n🔴 ¡BLOB ROJO DETECTADO! ({detection_info})")
+                    else:
+                        print(f"\n🎯 ¡{TARGET.upper()} DETECTADO! ({detection_info})")
                     print(f"✅ Acciones completadas: {action_count} >= {min_actions}")
                     cv2.destroyAllWindows()
                     cap.release()
@@ -300,18 +398,13 @@ def main():
                         cv2.putText(annotated_frame, f"Actions: {action_count}", 
                                    (10, y_offset + 30), cv2.FONT_HERSHEY_SIMPLEX, 
                                    0.7, (255, 255, 0), 2)
-                        
-                        # Mostrar si el blob está cerca
-                        if blob_detected:
-                            cv2.putText(annotated_frame, f"BLOB DETECTED! Size: {blob.size:.0f}", 
-                                       (10, frame.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 
-                                       0.7, (0, 0, 255), 2)
                 
                 # Display the resulting frame
-                cv2.imshow('YOLOv8 Pose Detection + Robobo Control', annotated_frame)
+                window_title = f"YOLOv8 Pose Detection + Robobo Control [{MODE.upper()} mode]"
+                cv2.imshow(window_title, annotated_frame)
                 
-                # Break the loop if 'q' is pressed
-                if cv2.waitKey(1) & 0xFF == ord('q'):
+                # Break the loop if "q" is pressed
+                if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
             else:
                 break
@@ -322,6 +415,11 @@ def main():
     finally:
         # Detener motores y desconectar
         rob.stopMotors()
+        if video_stream is not None:
+            try:
+                video_stream.disconnect()
+            except:
+                pass
         rob.disconnect()
         sim.disconnect()
         cap.release()
