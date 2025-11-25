@@ -272,7 +272,7 @@ def main():
         object_model = None
         video_stream = None
         print("Cargando modelo YOLO para detección de objetos...")
-        object_model = YOLO("yolov8n.pt")  # Standard YOLOv8 model for object detection
+        object_model = YOLO("yolo_models/yolov8n.pt")  # Standard YOLOv8 model for object detection
         print("Modelo YOLO cargado correctamente")
     
     # Cargar modelo de RL de la práctica 01
@@ -365,9 +365,6 @@ def main():
                     if yolo_detected:
                         target_detected = True
                         detection_info = f'conf: {yolo_info["confidence"]:.2f}, area: {yolo_info["area"]:.0f}'
-                        cv2.putText(annotated_frame, f'{TARGET.upper()} DETECTED! Conf: {yolo_info["confidence"]:.2f}', 
-                                   (10, frame.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 
-                                   0.7, (0, 0, 255), 2)
                     
                     # Display robot camera feed in YOLO mode
                     if robot_frame is not None:
