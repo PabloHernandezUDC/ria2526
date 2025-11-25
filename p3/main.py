@@ -185,6 +185,10 @@ def detect_yolo_object(video_stream, yolo_model, target_class="bottle", confiden
                 cv2.rectangle(frame, (x1, y1 - label_size[1] - 10), (x1 + label_size[0], y1), (0, 255, 0), -1)
                 cv2.putText(frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
                 
+                # Draw coordinates at the bottom of the frame
+                coords_text = f"Center: ({box_center_x:.0f}, {(y1 + y2) / 2:.0f}) | Area: {box_area:.0f}"
+                cv2.putText(frame, coords_text, (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                
                 detection_info = {
                     "confidence": conf,
                     "center_x": box_center_x,
