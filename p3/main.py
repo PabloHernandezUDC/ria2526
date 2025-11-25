@@ -118,10 +118,10 @@ def control_robot(action, rob, last_action, action_count):
             rob.moveWheels(20, 20)  # Avanzar
         elif action == "Left":
             print(f"[ACTION {action_count}] Turning LEFT")
-            rob.moveWheels(10, 20)  # Girar izquierda
+            rob.moveWheels(0, 25)  # Girar izquierda
         elif action == "Right":
             print(f"[ACTION {action_count}] Turning RIGHT")
-            rob.moveWheels(20, 10)  # Girar derecha
+            rob.moveWheels(25, 0)  # Girar derecha
         elif action == "Stop":
             print(f"[ACTION {action_count}] STOPPING")
             rob.stopMotors()
@@ -202,69 +202,73 @@ def detect_yolo_object(video_stream, yolo_model, target_class="bottle", confiden
     return False, None, frame
 
 
-def run_rl_policy(rob, model, target_color=BlobColor.RED):
+def run_rl_policy_step(rob, model, mode="blob", target_color=BlobColor.RED, video_stream=None, object_model=None, target_class="bottle"):
     """
-    Execute the RL policy from practice 01 to approach the red blob.
+    Execute one step of the RL policy.
+    Returns (continue, target_x, target_size, sector, action) tuple.
     """
-    print("\n" + "="*50)
-    print(" ACTIVANDO POLÍTICA DE REFUERZO (Práctica 01)")
-    print("="*50)
-    
-    max_steps = 100
-    step = 0
-    
-    while step < max_steps:
+    if mode == "blob":
         # Leer información del blob
         blob = rob.readColorBlob(target_color)
         
         if blob is None or blob.size < 50:
-            print(f"[Step {step}] Blob no detectado, buscando...")
             rob.moveWheels(15, 5)  # Girar buscando el blob
-            time.sleep(0.5)
-            step += 1
-            continue
+            return True, None, None, None, None
         
-        # Crear observación compatible con el modelo de la práctica 01
-        # El modelo espera un diccionario con clave "sector" (0-5)
-        red_x = blob.posx
-        if red_x == 0:
-            sector = 5
-        elif red_x == 100:
-            sector = 4
-        else:
-            sector = red_x // 20
+        # Usar coordenadas del blob (ya normalizadas en rango 0-100)
+        target_x = blob.posx
+        target_size = blob.size
         
-        observation = {
-            "sector": np.array([sector], dtype=int).flatten()
-        }
+    else:  # mode == "yolo"
+        # Detectar objeto con YOLO
+        yolo_detected, yolo_info, robot_frame = detect_yolo_object(video_stream, object_model, target_class, confidence_threshold=0.2)
         
-        # Predecir acción con el modelo
-        action, _states = model.predict(observation, deterministic=True)
+        if not yolo_detected:
+            rob.moveWheels(15, 5)  # Girar buscando el objeto
+            return True, None, None, None, None
         
-        # Ejecutar acción
-        if action == 0:  # Avanzar
-            print(f"[Step {step}] RL: Avanzando (blob size: {blob.size:.0f}, pos: {blob.posx:.0f}, sector: {sector})")
-            rob.moveWheels(20, 20)
-        elif action == 1:  # Girar izquierda
-            print(f"[Step {step}] RL: Girando IZQUIERDA (blob pos: {blob.posx:.0f}, sector: {sector})")
-            rob.moveWheels(20, 0)
-        elif action == 2:  # Girar derecha
-            print(f"[Step {step}] RL: Girando DERECHA (blob pos: {blob.posx:.0f}, sector: {sector})")
-            rob.moveWheels(0, 20)
+        # Normalizar coordenadas al rango 0-100
+        # Asumiendo que robot_frame tiene dimensiones estándar
+        frame_width = robot_frame.shape[1]
+        frame_center = frame_width / 2
         
-        time.sleep(0.1)
-        step += 1
+        # Normalizar center_x: centro de la imagen = 50, izquierda = 0, derecha = 100
+        target_x = ((yolo_info['center_x'] - frame_center) / frame_center) * 50 + 50
+        target_x = np.clip(target_x, 0, 100)  # Asegurar que esté en rango 0-100
         
-        # Condición de éxito: blob grande y centrado
-        if blob.size > 8000 and abs(blob.posx) < 50:
-            print(f"\n✅ ¡OBJETIVO ALCANZADO! (size: {blob.size:.0f})")
-            rob.stopMotors()
-            break
+        target_size = yolo_info['area']
     
-    rob.stopMotors()
-    print("="*50)
-    print("Política de refuerzo finalizada")
-    print("="*50 + "\n")
+    # Crear observación compatible con el modelo de la práctica 01
+    # El modelo espera un diccionario con clave "sector" (0-5)
+    if target_x == 0:
+        sector = 5
+    elif target_x == 100:
+        sector = 4
+    else:
+        sector = int(target_x // 20)
+    
+    observation = {
+        "sector": np.array([sector], dtype=int).flatten()
+    }
+    
+    # Predecir acción con el modelo
+    action, _states = model.predict(observation, deterministic=True)
+    
+    # Ejecutar acción
+    if action == 0:  # Avanzar
+        rob.moveWheels(20, 20)
+    elif action == 1:  # Girar izquierda
+        rob.moveWheels(20, 0)
+    elif action == 2:  # Girar derecha
+        rob.moveWheels(0, 20)
+    
+    # Condición de éxito: objeto grande y centrado
+    if mode == "blob":
+        success_condition = target_size > 8000 and abs(target_x - 50) < 20
+    else:
+        success_condition = target_size > 50000 and abs(target_x - 50) < 20
+    
+    return not success_condition, target_x, target_size, sector, action
 
 
 def main():
@@ -291,6 +295,9 @@ def main():
     sim.connect()
     rob.connect()
     print("Conectado correctamente al simulador")
+    
+    rob.moveTiltTo(100, speed=10, wait=True)
+
     
     # Initialize video stream if using YOLO mode
     if MODE == "yolo":
@@ -328,63 +335,67 @@ def main():
     last_action = None
     action_count = 0
     rl_activated = False
+    rl_step = 0
+    max_rl_steps = 100
     min_actions = 5  # Mínimo de acciones antes de activar RL
     
     try:
         while True:
-            # Verificar si ya se activó la política RL
+            # Capturar frame desde la cámara
+            ret, frame = cap.read()
+            
+            if not ret:
+                print("Error: No se pudo capturar imagen")
+                break
+            
+            # Run YOLOv8 pose detection on the frame
+            results = pose_model(frame, verbose=False)
+            
+            # Get current timestamp
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            
+            # Visualize the results on the frame
+            annotated_frame = results[0].plot()
+            
+            # Verificar detección según el modo seleccionado
+            target_detected = False
+            detection_info = None
+            
+            if MODE == "blob":
+                # Modo blob: detectar blob rojo
+                blob_detected, blob = detect_red_blob(rob)
+                if blob_detected:
+                    target_detected = True
+                    detection_info = f"size: {blob.size:.0f}"
+                    cv2.putText(annotated_frame, f"RED BLOB DETECTED! Size: {blob.size:.0f}", 
+                               (10, frame.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 
+                               0.7, (0, 0, 255), 2)
+            else:
+                # Modo YOLO: detectar objeto objetivo
+                yolo_detected, yolo_info, robot_frame = detect_yolo_object(video_stream, object_model, TARGET, confidence_threshold=0.2)
+                if yolo_detected:
+                    target_detected = True
+                    detection_info = f'conf: {yolo_info["confidence"]:.2f}, area: {yolo_info["area"]:.0f}'
+                
+                # Display robot camera feed in YOLO mode
+                if robot_frame is not None:
+                    cv2.imshow("Robot Camera", robot_frame)
+            
+            # Handle RL activation and execution
             if not rl_activated:
-                # Capturar frame desde la cámara
-                ret, frame = cap.read()
-                
-                if not ret:
-                    print("Error: No se pudo capturar imagen")
-                    break
-                
-                # Run YOLOv8 pose detection on the frame
-                results = pose_model(frame, verbose=False)
-                
-                # Get current timestamp
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                
-                # Visualize the results on the frame
-                annotated_frame = results[0].plot()
-                
-                # Verificar detección según el modo seleccionado
-                target_detected = False
-                detection_info = None
-                
-                if MODE == "blob":
-                    # Modo blob: detectar blob rojo
-                    blob_detected, blob = detect_red_blob(rob)
-                    if blob_detected:
-                        target_detected = True
-                        detection_info = f"size: {blob.size:.0f}"
-                        cv2.putText(annotated_frame, f"RED BLOB DETECTED! Size: {blob.size:.0f}", 
-                                   (10, frame.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 
-                                   0.7, (0, 0, 255), 2)
-                else:
-                    # Modo YOLO: detectar objeto objetivo
-                    yolo_detected, yolo_info, robot_frame = detect_yolo_object(video_stream, object_model, TARGET, confidence_threshold=0.2)
-                    if yolo_detected:
-                        target_detected = True
-                        detection_info = f'conf: {yolo_info["confidence"]:.2f}, area: {yolo_info["area"]:.0f}'
-                    
-                    # Display robot camera feed in YOLO mode
-                    if robot_frame is not None:
-                        cv2.imshow("Robot Camera", robot_frame)
-                
                 if target_detected and action_count >= min_actions:
                     if MODE == "blob":
                         print(f"\n🔴 ¡BLOB ROJO DETECTADO! ({detection_info})")
                     else:
                         print(f"\n🎯 ¡{TARGET.upper()} DETECTADO! ({detection_info})")
                     print(f"✅ Acciones completadas: {action_count} >= {min_actions}")
+                    print("\n" + "="*50)
+                    print(" ACTIVANDO POLÍTICA DE REFUERZO (Práctica 01)")
+                    print("="*50)
                     
                     # Activar política de RL
                     rl_activated = True
-                    run_rl_policy(rob, rl_model)
-                    break
+                    rl_step = 0
                 
                 # Extract keypoints and classify poses (only first person)
                 if results[0].keypoints is not None and len(results[0].keypoints) > 0:
@@ -412,15 +423,58 @@ def main():
                     cv2.putText(annotated_frame, f"Actions: {action_count}", 
                                (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 
                                0.7, (255, 255, 0), 2)
-                
-                # Display the resulting frame
-                window_title = f"YOLOv8 Pose Detection + Robobo Control [{MODE.upper()} mode]"
-                cv2.imshow(window_title, annotated_frame)
-                
-                # Break the loop if "q" is pressed
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    break
             else:
+                # Execute one RL step
+                if rl_step < max_rl_steps:
+                    if MODE == "blob":
+                        continue_rl, target_x, target_size, sector, action = run_rl_policy_step(
+                            rob, rl_model, mode="blob"
+                        )
+                    else:
+                        continue_rl, target_x, target_size, sector, action = run_rl_policy_step(
+                            rob, rl_model, mode="yolo", video_stream=video_stream, 
+                            object_model=object_model, target_class=TARGET
+                        )
+                    
+                    if target_x is not None:
+                        action_names = ["Avanzar", "Girar IZQUIERDA", "Girar DERECHA"]
+                        action_idx = int(action) if isinstance(action, np.ndarray) else action
+                        print(f"[Step {rl_step}] RL: {action_names[action_idx]} (size: {target_size:.0f}, pos: {target_x:.0f}, sector: {sector})")
+                    else:
+                        print(f"[Step {rl_step}] Objetivo no detectado, buscando...")
+                    
+                    # Display RL status on frame
+                    cv2.putText(annotated_frame, f"RL ACTIVE - Step: {rl_step}/{max_rl_steps}", 
+                               (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 
+                               1.0, (0, 255, 255), 2)
+                    if target_x is not None:
+                        cv2.putText(annotated_frame, f"Target: pos={target_x:.0f}, size={target_size:.0f}", 
+                                   (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 
+                                   0.7, (0, 255, 255), 2)
+                    
+                    rl_step += 1
+                    
+                    if not continue_rl:
+                        print(f"\n✅ ¡OBJETIVO ALCANZADO! (size: {target_size:.0f}, pos: {target_x:.0f})")
+                        rob.stopMotors()
+                        print("="*50)
+                        print("Política de refuerzo finalizada")
+                        print("="*50 + "\n")
+                        break
+                else:
+                    print("\n⏱️ Máximo de pasos alcanzado")
+                    rob.stopMotors()
+                    print("="*50)
+                    print("Política de refuerzo finalizada")
+                    print("="*50 + "\n")
+                    break
+            
+            # Display the resulting frame
+            window_title = f"YOLOv8 Pose Detection + Robobo Control [{MODE.upper()} mode]"
+            cv2.imshow(window_title, annotated_frame)
+            
+            # Break the loop if "q" is pressed
+            if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
                 
     except KeyboardInterrupt:
