@@ -13,13 +13,13 @@ from ultralytics import YOLO
 # --------------------
 
 # "blob" or "yolo"
-MODE = "blob"
+MODE = "yolo"
 
 # target class for YOLO
 TARGET = "bottle"  # Target object class for YOLO detection
 
 # robot ip (localhost for sim)
-IP = "localhost"
+IP = "172.20.10.3"
 
 # --------------------
 
@@ -174,6 +174,16 @@ def detect_yolo_object(video_stream, yolo_model, target_class="bottle", confiden
                 box_width = x2 - x1
                 box_height = y2 - y1
                 box_area = box_width * box_height
+                
+                # Draw bounding box on frame
+                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                
+                # Draw label with class name and confidence
+                label = f"{class_name} {conf:.2f}"
+                label_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+                cv2.rectangle(frame, (x1, y1 - label_size[1] - 10), (x1 + label_size[0], y1), (0, 255, 0), -1)
+                cv2.putText(frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
                 
                 detection_info = {
                     "confidence": conf,
@@ -351,13 +361,17 @@ def main():
                                    0.7, (0, 0, 255), 2)
                 else:
                     # Modo YOLO: detectar objeto objetivo
-                    yolo_detected, yolo_info, robot_frame = detect_yolo_object(video_stream, object_model, TARGET)
+                    yolo_detected, yolo_info, robot_frame = detect_yolo_object(video_stream, object_model, TARGET, confidence_threshold=0.2)
                     if yolo_detected:
                         target_detected = True
-                        detection_info = f"conf: {yolo_info["confidence"]:.2f}, area: {yolo_info["area"]:.0f}"
-                        cv2.putText(annotated_frame, f"{TARGET.upper()} DETECTED! Conf: {yolo_info["confidence"]:.2f}", 
+                        detection_info = f'conf: {yolo_info["confidence"]:.2f}, area: {yolo_info["area"]:.0f}'
+                        cv2.putText(annotated_frame, f'{TARGET.upper()} DETECTED! Conf: {yolo_info["confidence"]:.2f}', 
                                    (10, frame.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 
                                    0.7, (0, 0, 255), 2)
+                    
+                    # Display robot camera feed in YOLO mode
+                    if robot_frame is not None:
+                        cv2.imshow("Robot Camera", robot_frame)
                 
                 if target_detected and action_count >= min_actions:
                     if MODE == "blob":
@@ -365,39 +379,38 @@ def main():
                     else:
                         print(f"\n🎯 ¡{TARGET.upper()} DETECTADO! ({detection_info})")
                     print(f"✅ Acciones completadas: {action_count} >= {min_actions}")
-                    cv2.destroyAllWindows()
-                    cap.release()
                     
                     # Activar política de RL
                     rl_activated = True
                     run_rl_policy(rob, rl_model)
                     break
                 
-                # Extract keypoints and classify poses
+                # Extract keypoints and classify poses (only first person)
                 if results[0].keypoints is not None and len(results[0].keypoints) > 0:
-                    for person_idx, keypoints in enumerate(results[0].keypoints.data):
-                        # Convert to numpy array and get keypoints (x, y, confidence)
-                        kp_array = keypoints.cpu().numpy()
-                        
-                        # Classify the pose
-                        detected_action = classify_pose(kp_array)
-                        
-                        # Control the robot based on pose
-                        last_action, action_count = control_robot(
-                            detected_action, rob, last_action, action_count
-                        )
-                        
-                        # Print timestamp and detected action
-                        print(f"[{timestamp}] Person {person_idx + 1}: {detected_action}")
-                        
-                        # Display detected action on the frame
-                        y_offset = 30 + (person_idx * 60)
-                        cv2.putText(annotated_frame, f"Person {person_idx + 1}: {detected_action}", 
-                                   (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 
-                                   1.0, (0, 255, 0), 2)
-                        cv2.putText(annotated_frame, f"Actions: {action_count}", 
-                                   (10, y_offset + 30), cv2.FONT_HERSHEY_SIMPLEX, 
-                                   0.7, (255, 255, 0), 2)
+                    # Only process the first person detected
+                    keypoints = results[0].keypoints.data[0]
+                    
+                    # Convert to numpy array and get keypoints (x, y, confidence)
+                    kp_array = keypoints.cpu().numpy()
+                    
+                    # Classify the pose
+                    detected_action = classify_pose(kp_array)
+                    
+                    # Control the robot based on pose
+                    last_action, action_count = control_robot(
+                        detected_action, rob, last_action, action_count
+                    )
+                    
+                    # Print timestamp and detected action
+                    print(f"[{timestamp}] {detected_action}")
+                    
+                    # Display detected action on the frame
+                    cv2.putText(annotated_frame, f"Action: {detected_action}", 
+                               (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 
+                               1.0, (0, 255, 0), 2)
+                    cv2.putText(annotated_frame, f"Actions: {action_count}", 
+                               (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 
+                               0.7, (255, 255, 0), 2)
                 
                 # Display the resulting frame
                 window_title = f"YOLOv8 Pose Detection + Robobo Control [{MODE.upper()} mode]"
