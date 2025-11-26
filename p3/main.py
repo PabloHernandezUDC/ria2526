@@ -290,10 +290,12 @@ def main():
     
     # Conectar con RoboboSim
     print("Conectando con RoboboSim...")
-    sim = RoboboSim(IP)
     rob = Robobo(IP)
-    sim.connect()
     rob.connect()
+
+    if MODE == "blob":
+        sim = RoboboSim(IP)
+        sim.connect()
     print("Conectado correctamente al simulador")
     
     rob.moveTiltTo(100, speed=10, wait=True)
@@ -311,7 +313,7 @@ def main():
     print("Abriendo cámara del ordenador...")
     cap = cv2.VideoCapture(0)
     
-    if not cap.isOpened():
+    if not cap.isOpened() and MODE == "blob":
         print("Error: No se pudo abrir la cámara")
         rob.disconnect()
         sim.disconnect()
@@ -489,7 +491,8 @@ def main():
             except:
                 pass
         rob.disconnect()
-        sim.disconnect()
+        if MODE == "blob":
+            sim.disconnect()
         cap.release()
         cv2.destroyAllWindows()
         print("Robot desconectado y ventanas cerradas")
