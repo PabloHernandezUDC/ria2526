@@ -220,11 +220,12 @@ def run_rl_policy_step(rob, model, mode="blob", target_color=BlobColor.RED, vide
         target_size = blob.size
         
     else:  # mode == "yolo"
+        time.sleep(0.3)
         # Detectar objeto con YOLO
         yolo_detected, yolo_info, robot_frame = detect_yolo_object(video_stream, object_model, target_class, confidence_threshold=0.2)
         
         if not yolo_detected:
-            rob.moveWheels(15, 5)  # Girar buscando el objeto
+            rob.moveWheels(5, 0)  # Girar buscando el objeto
             return True, None, None, None, None
         
         # Normalizar coordenadas al rango 0-100
@@ -256,17 +257,17 @@ def run_rl_policy_step(rob, model, mode="blob", target_color=BlobColor.RED, vide
     
     # Ejecutar acción
     if action == 0:  # Avanzar
-        rob.moveWheels(20, 20)
+        rob.moveWheelsByTime(10, 10, 0.5)
     elif action == 1:  # Girar izquierda
-        rob.moveWheels(20, 0)
+        rob.moveWheelsByTime(10, 0, 0.5)
     elif action == 2:  # Girar derecha
-        rob.moveWheels(0, 20)
+        rob.moveWheelsByTime(0, 10, 0.5)
     
     # Condición de éxito: objeto grande y centrado
     if mode == "blob":
         success_condition = target_size > 8000 and abs(target_x - 50) < 20
     else:
-        success_condition = target_size > 50000 and abs(target_x - 50) < 20
+        success_condition = target_size > 70000
     
     return not success_condition, target_x, target_size, sector, action
 
@@ -338,7 +339,7 @@ def main():
     action_count = 0
     rl_activated = False
     rl_step = 0
-    max_rl_steps = 100
+    max_rl_steps = 1000
     min_actions = 5  # Mínimo de acciones antes de activar RL
     
     try:
@@ -374,7 +375,7 @@ def main():
                                0.7, (0, 0, 255), 2)
             else:
                 # Modo YOLO: detectar objeto objetivo
-                yolo_detected, yolo_info, robot_frame = detect_yolo_object(video_stream, object_model, TARGET, confidence_threshold=0.2)
+                yolo_detected, yolo_info, robot_frame = detect_yolo_object(video_stream, object_model, TARGET, confidence_threshold=0.5)
                 if yolo_detected:
                     target_detected = True
                     detection_info = f'conf: {yolo_info["confidence"]:.2f}, area: {yolo_info["area"]:.0f}'
