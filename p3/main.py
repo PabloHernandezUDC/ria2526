@@ -289,7 +289,7 @@ def main():
     print("Modelo cargado correctamente")
     
     # Conectar con RoboboSim
-    print("Conectando con RoboboSim...")
+    print("Conectando con Robobo...")
     rob = Robobo(IP)
     rob.connect()
 
