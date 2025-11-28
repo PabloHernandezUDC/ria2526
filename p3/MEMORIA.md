@@ -3,6 +3,7 @@
   body {
     font-size: 11pt;
     line-height: 1.3;
+    text-align: justify;
   }
   h1 {
     font-size: 16pt;
@@ -14,12 +15,19 @@
     font-size: 11pt;
   }
   p {
+    text-align: justify;
   }
   table {
   }
   @page {
     size: A4;
   }
+}
+body {
+  text-align: justify;
+}
+p {
+  text-align: justify;
 }
 </style>
 
