@@ -1,0 +1,7 @@
+opencv-python==4.12.0.88
+numpy==2.2.6
+robobopy==1.5.0
+robobopy_videostream==1.1.0
+robobosim==1.5.1
+stable_baselines3==2.7.0
+ultralytics==8.3.227
