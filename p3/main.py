@@ -286,7 +286,7 @@ def main():
     
     # Cargar modelo de RL de la práctica 01
     print("Cargando modelo de RL de práctica 01...")
-    rl_model = PPO.load("checkpoints/1/checkpoint.zip")
+    rl_model = PPO.load("politica_ppo.zip")
     print("Modelo cargado correctamente")
     
     # Conectar con RoboboSim
