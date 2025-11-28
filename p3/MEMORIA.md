@@ -1,4 +1,4 @@
-<style>
+<!-- <style>
 @media print {
   body {
     margin: 1cm 1.5cm;
@@ -33,9 +33,9 @@
     margin: 1cm 1.5cm;
   }
 }
-</style>
+</style> -->
 
-# PRÁCTICA 03: DETECCIÓN EN TIEMPO REAL
+# Práctica 03: Detección en tiempo real
 
 ## Robótica Inteligente y Autónoma (RIA) - Curso 2025-2026
 
@@ -52,7 +52,7 @@
 
 Esta práctica implementa un sistema de control del robot Robobo real mediante detección de poses corporales en tiempo real usando modelos YOLO. El sistema opera en dos fases secuenciales: primero, una fase de **teleoperación** donde el usuario controla el robot mediante gestos con los brazos para aproximarlo hacia un objetivo; posteriormente, una fase de **aproximación autónoma** donde la política de RL aprendida en la P.01 toma el control para completar la tarea: llegar al objetivo.
 
-### 1.2 Arquitectura del Sistema
+### 1.2 Arquitectura del sistema
 
 El sistema integra múltiples componentes de visión por computador y control robótico:
 
@@ -80,23 +80,23 @@ La webcam del PC captura al usuario y alimenta YOLOv8-pose para clasificar sus g
 </tr>
 </table>
 
-### 1.3 Sistema de Control Gestual
+### 1.3 Sistema de control gestual
 
 La detección de poses considera algunos de los 17 keypoints corporales del modelo YOLOv8-pose. El sistema de control se basa en la posición relativa de las muñecas respecto a los hombros:
 
 <table style="width:100%; border:none;">
 <tr>
-<td style="width:40%; vertical-align:top; border:none;">
+<td style="width:50%; vertical-align:top; border:none;">
 
-| Gesto | Condición | Acción Robot |
-|-------|-----------|--------------|
-| Ambos brazos arriba | `wrist_y < shoulder_y - 20` (ambos) | Avanzar (20, 20) |
-| Brazo derecho arriba | Solo derecho elevado | Girar izquierda (0, 25) |
-| Brazo izquierdo arriba | Solo izquierdo elevado | Girar derecha (25, 0) |
-| Sin brazos arriba | Ninguno elevado | Detener motores |
+| Gesto | Acción del robot |
+|-------|--------------|
+| Ambos brazos arriba | Avanzar (20, 20) |
+| Brazo derecho arriba  | Girar izquierda (0, 25) |
+| Brazo izquierdo arriba | Girar derecha (25, 0) |
+| Sin brazos arriba | Detener motores |
 
 </td>
-<td style="width:60%; vertical-align:top; border:none; padding-left:20px;">
+<td style="width:50%; vertical-align:top; border:none; padding-left:20px;">
 
 **Decisiones de diseño:** El umbral de 20 píxeles entre muñeca y hombro proporciona robustez ante ruido en la detección sin requerir movimientos excesivamente exagerados. La inversión del control (brazo derecho → giro izquierda) resulta más intuitiva para el operador, ya que el robot gira hacia donde "apunta" el brazo elevado desde la perspectiva del usuario frente a la cámara. El sistema solo ejecuta acciones cuando detecta cambios de gesto, evitando comandos redundantes.
 
@@ -108,7 +108,7 @@ La detección de poses considera algunos de los 17 keypoints corporales del mode
 
 ## 2. MODOS DE DETECCIÓN Y TRANSICIÓN A POLÍTICA RL
 
-### 2.1 Detección del Objeto Objetivo
+### 2.1 Detección del objetivo
 
 El sistema soporta dos modos de detección configurables mediante la variable `MODE`:
 
@@ -116,7 +116,7 @@ El sistema soporta dos modos de detección configurables mediante la variable `M
 
 **Modo YOLO (robot real):** Emplea YOLOv8n para detectar objetos arbitrarios definidos por la variable `TARGET` (por defecto "bottle"). La cámara del robot transmite vídeo mediante streaming, que se procesa frame a frame para localizar el objeto con un umbral de confianza de 0.5.
 
-### 2.2 Integración con Política de Refuerzo
+### 2.2 Integración con política de RL
 
 <table style="width:100%; border:none;">
 <tr>
